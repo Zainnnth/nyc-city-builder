@@ -59,6 +59,8 @@ var style_profile_by_index: Array[String] = []
 
 var sim_timer := 0.0
 const SIM_STEP_SECONDS := 1.0
+var sim_speed := 1.0
+var sim_paused := false
 
 var money := 8000
 var population := 0
@@ -138,9 +140,12 @@ func _ready() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if sim_paused:
+		return
 	sim_timer += delta
-	while sim_timer >= SIM_STEP_SECONDS:
-		sim_timer -= SIM_STEP_SECONDS
+	var step_size: float = SIM_STEP_SECONDS / max(sim_speed, 0.001)
+	while sim_timer >= step_size:
+		sim_timer -= step_size
 		_run_sim_step()
 		queue_redraw()
 
@@ -194,6 +199,8 @@ func _draw_hud(map_size: Vector2) -> void:
 	var text := "Tool: %s   |   Money: $%d   |   Pop: %d   |   Jobs: %d" % [
 		TOOL_NAMES[selected_tool], money, population, jobs
 	]
+	var speed_text := "Paused" if sim_paused else ("%.1fx" % sim_speed)
+	text += "   |   Sim: %s" % speed_text
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(16, map_size.y + 36),
@@ -377,6 +384,8 @@ func reset_grid() -> void:
 	district_demand_snapshot.clear()
 	district_policy_map.clear()
 	sim_timer = 0.0
+	sim_speed = 1.0
+	sim_paused = false
 	queue_redraw()
 
 func apply_district_seed(seed_records: Array[Dictionary]) -> void:
@@ -549,6 +558,9 @@ func export_state() -> Dictionary:
 		"district_id_by_index": district_id_by_index.duplicate(),
 		"style_profile_by_index": style_profile_by_index.duplicate(),
 		"district_policy_map": district_policy_map.duplicate(true)
+		,
+		"sim_speed": sim_speed,
+		"sim_paused": sim_paused
 	}
 
 func import_state(state: Dictionary) -> bool:
@@ -612,6 +624,8 @@ func import_state(state: Dictionary) -> bool:
 	population = int(state.get("population", 0))
 	jobs = int(state.get("jobs", 0))
 	selected_tool = int(state.get("selected_tool", int(Tool.ROAD)))
+	sim_speed = float(state.get("sim_speed", 1.0))
+	sim_paused = bool(state.get("sim_paused", false))
 	connected_residential = 0
 	connected_commercial = 0
 	connected_industrial = 0
@@ -619,3 +633,18 @@ func import_state(state: Dictionary) -> bool:
 	sim_timer = 0.0
 	queue_redraw()
 	return true
+
+func set_sim_speed(new_speed: float) -> void:
+	sim_speed = clamp(new_speed, 0.25, 5.0)
+	sim_paused = false
+	queue_redraw()
+
+func set_sim_paused(paused: bool) -> void:
+	sim_paused = paused
+	queue_redraw()
+
+func is_sim_paused() -> bool:
+	return sim_paused
+
+func get_sim_speed() -> float:
+	return sim_speed

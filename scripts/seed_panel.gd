@@ -13,6 +13,9 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var load_latest_button: Button = $Panel/VBox/Persistence/LoadLatestButton
 @onready var slot_select: OptionButton = $Panel/VBox/Persistence/SlotSelect
 @onready var autosave_toggle: CheckBox = $Panel/VBox/Persistence/AutosaveToggle
+@onready var pause_button: Button = $Panel/VBox/TimeControls/PauseButton
+@onready var speed_1x_button: Button = $Panel/VBox/TimeControls/Speed1xButton
+@onready var speed_3x_button: Button = $Panel/VBox/TimeControls/Speed3xButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var popup_panel: PanelContainer = $DistrictPopup
@@ -68,6 +71,9 @@ func _ready() -> void:
 	load_latest_button.pressed.connect(_on_load_latest_city)
 	slot_select.item_selected.connect(_on_slot_changed)
 	autosave_toggle.toggled.connect(_on_autosave_toggled)
+	pause_button.pressed.connect(_on_pause_toggled)
+	speed_1x_button.pressed.connect(_on_set_speed.bind(1.0))
+	speed_3x_button.pressed.connect(_on_set_speed.bind(3.0))
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -81,6 +87,7 @@ func _process(delta: float) -> void:
 	if ui_timer >= 0.4:
 		ui_timer = 0.0
 		_refresh_demand_bars()
+		_update_time_buttons()
 	if autosave_toggle.button_pressed:
 		autosave_timer += delta
 		if autosave_timer >= AUTOSAVE_INTERVAL:
@@ -258,6 +265,7 @@ func _init_slot_ui() -> void:
 	autosave_timer = 0.0
 	autosave_next_slot = 1
 	_update_slot_labels()
+	_update_time_buttons()
 
 func _on_slot_changed(_idx: int) -> void:
 	autosave_next_slot = _current_slot()
@@ -302,3 +310,36 @@ func _update_slot_labels() -> void:
 		var item_idx: int = slot - 1
 		var text: String = "Slot %d%s" % [slot, " *" if exists else ""]
 		slot_select.set_item_text(item_idx, text)
+
+func _on_pause_toggled() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_sim_paused"):
+		return
+	var current_paused: bool = false
+	if city_grid.has_method("is_sim_paused"):
+		current_paused = city_grid.call("is_sim_paused")
+	city_grid.call("set_sim_paused", not current_paused)
+	_update_time_buttons()
+
+func _on_set_speed(speed: float) -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_sim_speed"):
+		return
+	city_grid.call("set_sim_speed", speed)
+	_update_time_buttons()
+
+func _update_time_buttons() -> void:
+	if city_grid == null:
+		return
+	var paused := false
+	var speed := 1.0
+	if city_grid.has_method("is_sim_paused"):
+		paused = city_grid.call("is_sim_paused")
+	if city_grid.has_method("get_sim_speed"):
+		speed = float(city_grid.call("get_sim_speed"))
+
+	pause_button.text = "Resume" if paused else "Pause"
+	speed_1x_button.disabled = paused or is_equal_approx(speed, 1.0)
+	speed_3x_button.disabled = paused or is_equal_approx(speed, 3.0)
