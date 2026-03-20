@@ -38,7 +38,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Runtime-generated block forms from seeded records (no external meshes required)
     - Style-driven shaping from `data/runtime/massing_profiles.json`
     - District prefab assignment with weighted spawn rules from `data/runtime/prefab_sets.json`
-    - District-tinted cel-style shading pass for quick skyline readability
+    - District-tinted cel-style shader pass (`shaders/cel_massing.gdshader`) for skyline readability
     - Landmark pack v0 overlays weighted hero proxies by district/archetype
     - Landmark config in `data/runtime/landmark_pack.json`
     - Hand-authored landmark asset manifest + LOD rules in `data/runtime/landmark_assets.json`

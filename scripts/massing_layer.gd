@@ -6,6 +6,11 @@ extends Node2D
 @export var landmark_pack_path := "res://data/runtime/landmark_pack.json"
 @export var landmark_assets_path := "res://data/runtime/landmark_assets.json"
 @export var prefab_sets_path := "res://data/runtime/prefab_sets.json"
+@export var cel_shader_path := "res://shaders/cel_massing.gdshader"
+@export var use_cel_shader := true
+@export_range(2.0, 8.0, 1.0) var cel_shade_steps := 4.0
+@export_range(0.8, 1.6, 0.01) var cel_shade_contrast := 1.08
+@export_range(0.0, 1.0, 0.01) var cel_band_mix := 0.7
 @export var enabled := true
 
 var district_generator: Node2D
@@ -42,6 +47,7 @@ func _ready() -> void:
 	landmark_pack = _load_landmark_pack()
 	landmark_assets = _load_landmark_assets()
 	prefab_sets = _load_prefab_sets()
+	_apply_cel_shader()
 	if district_generator != null and district_generator.has_signal("seed_records_generated"):
 		district_generator.connect("seed_records_generated", _on_seed_records_generated)
 	if district_generator != null and district_generator.has_method("get_seed_records_snapshot"):
@@ -490,6 +496,28 @@ func _draw_landmark_detail(inst: Dictionary) -> void:
 			draw_line(center, center + Vector2(0.0, -marker_h * 0.8), accent, 1.0)
 	else:
 		draw_circle(center, 1.6, accent)
+
+func _apply_cel_shader() -> void:
+	if not use_cel_shader:
+		material = null
+		return
+	if cel_shader_path == "":
+		material = null
+		return
+	var shader_res: Resource = load(cel_shader_path)
+	if shader_res == null:
+		material = null
+		return
+	if not (shader_res is Shader):
+		material = null
+		return
+	var shader: Shader = shader_res
+	var shader_mat: ShaderMaterial = ShaderMaterial.new()
+	shader_mat.shader = shader
+	shader_mat.set_shader_parameter("shade_steps", cel_shade_steps)
+	shader_mat.set_shader_parameter("shade_contrast", cel_shade_contrast)
+	shader_mat.set_shader_parameter("band_mix", cel_band_mix)
+	material = shader_mat
 
 func _hash01(cell: Vector2i, world_seed: int, salt: int) -> float:
 	var h: int = int(hash("%d:%d:%d:%d" % [cell.x, cell.y, world_seed, salt]))
