@@ -42,6 +42,9 @@ func _initialize() -> void:
 		if city_grid != null:
 			_check_deterministic_simulation(city_grid, district_generator, failures)
 
+	if failures.is_empty() and massing_layer != null:
+		_check_massing_layer_api(massing_layer, failures)
+
 	if failures.is_empty():
 		print("[SMOKE] PASS: core systems booted and API checks passed.")
 		quit(0)
@@ -110,6 +113,19 @@ func _check_generator_api(district_generator: Node, failures: Array[String]) -> 
 		failures.append("DistrictGenerator missing method: regenerate")
 		return
 	district_generator.call("regenerate", 1998, false)
+
+func _check_massing_layer_api(massing_layer: Node, failures: Array[String]) -> void:
+	if not massing_layer.has_method("get_render_stats"):
+		failures.append("MassingLayer missing method: get_render_stats")
+		return
+	var stats_v: Variant = massing_layer.call("get_render_stats")
+	if typeof(stats_v) != TYPE_DICTIONARY:
+		failures.append("MassingLayer get_render_stats did not return Dictionary")
+		return
+	var stats: Dictionary = stats_v
+	for key in ["total_instances", "visible_instances", "drawn_instances", "landmark_details"]:
+		if not stats.has(key):
+			failures.append("MassingLayer render stats missing key: %s" % key)
 
 func _check_deterministic_simulation(city_grid: Node, district_generator: Node, failures: Array[String]) -> void:
 	var run_a: Dictionary = _run_seeded_signature(city_grid, district_generator, 1998)

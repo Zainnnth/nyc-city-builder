@@ -6,6 +6,7 @@ extends Node2D
 @export var landmark_pack_path := "res://data/runtime/landmark_pack.json"
 @export var landmark_assets_path := "res://data/runtime/landmark_assets.json"
 @export var prefab_sets_path := "res://data/runtime/prefab_sets.json"
+@export var optimization_profile_path := "res://data/runtime/render_optimization.json"
 @export var cel_shader_path := "res://shaders/cel_massing.gdshader"
 @export var use_cel_shader := true
 @export_range(2.0, 8.0, 1.0) var cel_shade_steps := 4.0
@@ -19,7 +20,14 @@ var massing_profiles: Dictionary = {}
 var landmark_pack: Dictionary = {}
 var landmark_assets: Dictionary = {}
 var prefab_sets: Dictionary = {}
+var optimization_profile: Dictionary = {}
 var massing_instances: Array[Dictionary] = []
+var last_render_stats := {
+	"total_instances": 0,
+	"visible_instances": 0,
+	"drawn_instances": 0,
+	"landmark_details": 0
+}
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -39,6 +47,13 @@ const DEFAULT_PROFILE := {
 	"roof_tint": "#d8b691",
 	"wall_tint": "#8aa0bf"
 }
+const DEFAULT_OPTIMIZATION_PROFILE := {
+	"enable_viewport_culling": true,
+	"cull_margin_px": 220.0,
+	"max_draw_instances": 900,
+	"max_lod0_details": 220,
+	"max_lod1_details": 420
+}
 
 func _ready() -> void:
 	district_generator = get_node_or_null(district_generator_path)
@@ -47,6 +62,7 @@ func _ready() -> void:
 	landmark_pack = _load_landmark_pack()
 	landmark_assets = _load_landmark_assets()
 	prefab_sets = _load_prefab_sets()
+	optimization_profile = _load_optimization_profile()
 	_apply_cel_shader()
 	if district_generator != null and district_generator.has_signal("seed_records_generated"):
 		district_generator.connect("seed_records_generated", _on_seed_records_generated)
@@ -60,14 +76,49 @@ func _ready() -> void:
 func _draw() -> void:
 	if not enabled:
 		return
+	var view_rect: Rect2 = _view_cull_rect()
+	var use_culling: bool = bool(optimization_profile.get("enable_viewport_culling", true))
+	var max_draw_instances: int = max(1, int(optimization_profile.get("max_draw_instances", 900)))
+	var max_lod0_details: int = max(0, int(optimization_profile.get("max_lod0_details", 220)))
+	var max_lod1_details: int = max(0, int(optimization_profile.get("max_lod1_details", 420)))
+	var total_instances: int = massing_instances.size()
+	var visible_instances := 0
+	var drawn_instances := 0
+	var detail_count := 0
+	var lod0_detail_count := 0
+	var lod1_detail_count := 0
 	for inst in massing_instances:
+		var bounds_v: Variant = inst.get("bounds", Rect2())
+		var bounds: Rect2 = bounds_v if typeof(bounds_v) == TYPE_RECT2 else Rect2()
+		if use_culling and not view_rect.intersects(bounds):
+			continue
+		visible_instances += 1
+		if drawn_instances >= max_draw_instances:
+			break
 		draw_colored_polygon(inst["left"], inst["left_color"])
 		draw_colored_polygon(inst["right"], inst["right_color"])
 		draw_colored_polygon(inst["front"], inst["front_color"])
 		draw_colored_polygon(inst["top"], inst["top_color"])
 		draw_polyline(inst["top_outline"], inst["outline_color"], 1.0)
+		drawn_instances += 1
 		if String(inst.get("landmark_name", "")) != "":
-			_draw_landmark_detail(inst)
+			var lod_id: String = _landmark_lod_for_inst(inst)
+			if lod_id == "lod0":
+				if lod0_detail_count >= max_lod0_details:
+					continue
+				lod0_detail_count += 1
+				detail_count += 1
+			elif lod_id == "lod1":
+				if lod1_detail_count >= max_lod1_details:
+					continue
+				lod1_detail_count += 1
+				detail_count += 1
+			_draw_landmark_detail(inst, lod_id)
+
+	last_render_stats["total_instances"] = total_instances
+	last_render_stats["visible_instances"] = visible_instances
+	last_render_stats["drawn_instances"] = drawn_instances
+	last_render_stats["landmark_details"] = detail_count
 
 func _on_seed_records_generated(seed_records: Array, world_seed: int) -> void:
 	_rebuild_massing(seed_records, world_seed)
@@ -167,7 +218,8 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 				"prefab_id": String(prefab.get("id", "")),
 				"archetype": archetype,
 				"height_px": height_px,
-				"roof_center": (t0 + t1 + t2 + t3) / 4.0
+				"roof_center": (t0 + t1 + t2 + t3) / 4.0,
+				"bounds": _polygon_bounds(PackedVector2Array([g0, g1, g2, g3, t0, t1, t2, t3]))
 			}
 		)
 
@@ -227,6 +279,25 @@ func _load_prefab_sets() -> Dictionary:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	return Dictionary(parsed).duplicate(true)
+
+func _load_optimization_profile() -> Dictionary:
+	var merged: Dictionary = DEFAULT_OPTIMIZATION_PROFILE.duplicate(true)
+	if not FileAccess.file_exists(optimization_profile_path):
+		return merged
+	var fp := FileAccess.open(optimization_profile_path, FileAccess.READ)
+	if fp == null:
+		return merged
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return merged
+	var payload: Dictionary = parsed
+	var profile_v: Variant = payload.get("profile", payload)
+	if typeof(profile_v) != TYPE_DICTIONARY:
+		return merged
+	var profile: Dictionary = profile_v
+	for key in profile.keys():
+		merged[key] = profile[key]
+	return merged
 
 func _profile_for(style_profile: String) -> Dictionary:
 	if massing_profiles.has(style_profile):
@@ -446,15 +517,15 @@ func _prefab_entry_matches(seed_record: Dictionary, entry: Dictionary) -> bool:
 func _cell_key(cell: Vector2i) -> String:
 	return "%d:%d" % [cell.x, cell.y]
 
-func _draw_landmark_detail(inst: Dictionary) -> void:
+func _landmark_lod_for_inst(inst: Dictionary) -> String:
 	var asset_id: String = String(inst.get("landmark_asset_id", ""))
 	if asset_id == "":
-		return
+		return ""
 	if not landmark_assets.has(asset_id):
-		return
+		return ""
 	var asset_v: Variant = landmark_assets.get(asset_id, {})
 	if typeof(asset_v) != TYPE_DICTIONARY:
-		return
+		return ""
 	var asset: Dictionary = asset_v
 	var lod_rules_v: Variant = asset.get("lod_rules", {})
 	var lod_rules: Dictionary = lod_rules_v if typeof(lod_rules_v) == TYPE_DICTIONARY else {}
@@ -465,12 +536,23 @@ func _draw_landmark_detail(inst: Dictionary) -> void:
 		zoom = float(cam.zoom.x)
 	var lod_id := "lod1"
 	if zoom <= float(lod_rules.get("lod0_max_zoom", 0.8)):
-		lod_id = "lod0"
+		return "lod0"
 	elif zoom <= float(lod_rules.get("lod1_max_zoom", 1.45)):
-		lod_id = "lod1"
-	else:
-		lod_id = "lod2"
+		return "lod1"
+	return "lod2"
 
+func _draw_landmark_detail(inst: Dictionary, lod_id: String) -> void:
+	if lod_id == "":
+		return
+	var asset_id: String = String(inst.get("landmark_asset_id", ""))
+	if asset_id == "":
+		return
+	if not landmark_assets.has(asset_id):
+		return
+	var asset_v: Variant = landmark_assets.get(asset_id, {})
+	if typeof(asset_v) != TYPE_DICTIONARY:
+		return
+	var asset: Dictionary = asset_v
 	var top: PackedVector2Array = inst.get("top", PackedVector2Array())
 	if top.size() < 4:
 		return
@@ -496,6 +578,36 @@ func _draw_landmark_detail(inst: Dictionary) -> void:
 			draw_line(center, center + Vector2(0.0, -marker_h * 0.8), accent, 1.0)
 	else:
 		draw_circle(center, 1.6, accent)
+
+func get_render_stats() -> Dictionary:
+	return last_render_stats.duplicate(true)
+
+func _view_cull_rect() -> Rect2:
+	var vp_size: Vector2 = get_viewport_rect().size
+	var cam := get_viewport().get_camera_2d()
+	if cam == null:
+		return Rect2(Vector2(-100000.0, -100000.0), Vector2(200000.0, 200000.0))
+	var zoom: Vector2 = cam.zoom
+	var half_world := Vector2(vp_size.x * zoom.x, vp_size.y * zoom.y) * 0.5
+	var global_rect := Rect2(cam.global_position - half_world, half_world * 2.0)
+	var local_pos := to_local(global_rect.position)
+	var local_rect := Rect2(local_pos, global_rect.size)
+	var margin: float = max(0.0, float(optimization_profile.get("cull_margin_px", 220.0)))
+	return local_rect.grow(margin)
+
+func _polygon_bounds(points: PackedVector2Array) -> Rect2:
+	if points.is_empty():
+		return Rect2()
+	var min_x := points[0].x
+	var max_x := points[0].x
+	var min_y := points[0].y
+	var max_y := points[0].y
+	for p in points:
+		min_x = min(min_x, p.x)
+		max_x = max(max_x, p.x)
+		min_y = min(min_y, p.y)
+		max_y = max(max_y, p.y)
+	return Rect2(Vector2(min_x, min_y), Vector2(max_x - min_x, max_y - min_y))
 
 func _apply_cel_shader() -> void:
 	if not use_cel_shader:

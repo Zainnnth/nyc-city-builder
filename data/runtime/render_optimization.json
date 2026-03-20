@@ -1,0 +1,9 @@
+{
+  "profile": {
+    "enable_viewport_culling": true,
+    "cull_margin_px": 220.0,
+    "max_draw_instances": 900,
+    "max_lod0_details": 220,
+    "max_lod1_details": 420
+  }
+}
