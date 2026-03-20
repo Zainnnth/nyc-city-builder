@@ -42,6 +42,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Landmark pack v0 overlays weighted hero proxies by district/archetype
     - Landmark config in `data/runtime/landmark_pack.json`
     - Hand-authored landmark asset manifest + LOD rules in `data/runtime/landmark_assets.json`
+    - Hybrid landmark import: loads configured `PackedScene` assets when present, proxy fallback otherwise
     - Render optimization profile (viewport culling + draw/detail budgets) in `data/runtime/render_optimization.json`
 - In-game seed panel:
   - Enter a seed and click `Apply Seed` to regenerate neighborhoods.

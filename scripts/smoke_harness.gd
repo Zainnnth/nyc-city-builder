@@ -123,7 +123,7 @@ func _check_massing_layer_api(massing_layer: Node, failures: Array[String]) -> v
 		failures.append("MassingLayer get_render_stats did not return Dictionary")
 		return
 	var stats: Dictionary = stats_v
-	for key in ["total_instances", "visible_instances", "drawn_instances", "landmark_details"]:
+	for key in ["total_instances", "visible_instances", "drawn_instances", "landmark_details", "imported_landmarks"]:
 		if not stats.has(key):
 			failures.append("MassingLayer render stats missing key: %s" % key)
 

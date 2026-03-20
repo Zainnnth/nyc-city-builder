@@ -2,6 +2,10 @@
   "assets": {
     "empire_state_proxy": {
       "display_name": "Empire State Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 1.2,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -10.0,
       "height_mult": 1.35,
       "accent_tint": "#f8cf8d",
       "wall_tint": "#9ab4d3",
@@ -15,6 +19,10 @@
     },
     "chrysler_proxy": {
       "display_name": "Chrysler Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 1.1,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -8.0,
       "height_mult": 1.25,
       "accent_tint": "#ffd9aa",
       "wall_tint": "#a4b6d0",
@@ -28,6 +36,10 @@
     },
     "fidi_crown_proxy": {
       "display_name": "FiDi Crown Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 1.12,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -8.0,
       "height_mult": 1.3,
       "accent_tint": "#e9b482",
       "wall_tint": "#93abc8",
@@ -41,6 +53,10 @@
     },
     "les_neon_hub_proxy": {
       "display_name": "LES Neon Hub Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 0.95,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -5.0,
       "height_mult": 1.08,
       "accent_tint": "#ffaf87",
       "wall_tint": "#96a6be",
@@ -54,6 +70,10 @@
     },
     "harlem_hall_proxy": {
       "display_name": "Harlem Hall Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 0.92,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -4.0,
       "height_mult": 1.05,
       "accent_tint": "#e3a783",
       "wall_tint": "#909cad",
@@ -67,6 +87,10 @@
     },
     "queens_exchange_proxy": {
       "display_name": "Queens Exchange Proxy",
+      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "scene_scale": 1.0,
+      "scene_offset_x": 0.0,
+      "scene_offset_y": -6.0,
       "height_mult": 1.12,
       "accent_tint": "#dbb183",
       "wall_tint": "#8ba2bf",

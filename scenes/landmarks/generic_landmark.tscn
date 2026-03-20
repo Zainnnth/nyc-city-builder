@@ -1,0 +1,13 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="GenericLandmark" type="Node2D"]
+z_index = 200
+
+[node name="Body" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-10, 8, 10, 8, 8, -24, 0, -36, -8, -24)
+color = Color(0.98, 0.79, 0.46, 0.9)
+
+[node name="Accent" type="Line2D" parent="."]
+default_color = Color(0.95, 0.9, 0.75, 0.9)
+width = 1.2
+points = PackedVector2Array(0, -36, 0, -46)

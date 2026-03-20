@@ -22,11 +22,13 @@ var landmark_assets: Dictionary = {}
 var prefab_sets: Dictionary = {}
 var optimization_profile: Dictionary = {}
 var massing_instances: Array[Dictionary] = []
+var imported_landmark_nodes: Array[Node2D] = []
 var last_render_stats := {
 	"total_instances": 0,
 	"visible_instances": 0,
 	"drawn_instances": 0,
-	"landmark_details": 0
+	"landmark_details": 0,
+	"imported_landmarks": 0
 }
 
 const DISTRICT_TINTS := {
@@ -102,6 +104,8 @@ func _draw() -> void:
 		draw_polyline(inst["top_outline"], inst["outline_color"], 1.0)
 		drawn_instances += 1
 		if String(inst.get("landmark_name", "")) != "":
+			if bool(inst.get("landmark_has_import", false)):
+				continue
 			var lod_id: String = _landmark_lod_for_inst(inst)
 			if lod_id == "lod0":
 				if lod0_detail_count >= max_lod0_details:
@@ -119,12 +123,14 @@ func _draw() -> void:
 	last_render_stats["visible_instances"] = visible_instances
 	last_render_stats["drawn_instances"] = drawn_instances
 	last_render_stats["landmark_details"] = detail_count
+	last_render_stats["imported_landmarks"] = imported_landmark_nodes.size()
 
 func _on_seed_records_generated(seed_records: Array, world_seed: int) -> void:
 	_rebuild_massing(seed_records, world_seed)
 
 func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 	massing_instances.clear()
+	_clear_imported_landmark_nodes()
 	if not enabled:
 		queue_redraw()
 		return
@@ -133,6 +139,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 	if city_grid != null:
 		cell_size = float(city_grid.get("cell_size"))
 	var landmark_assignments: Dictionary = _select_landmark_assignments(seed_records, world_seed)
+	var import_requests: Array[Dictionary] = []
 
 	for seed_record_v in seed_records:
 		if typeof(seed_record_v) != TYPE_DICTIONARY:
@@ -203,6 +210,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		massing_instances.append(
 			{
 				"sort_key": g2.y,
+				"cell_key": _cell_key(cell),
 				"left": PackedVector2Array([g0, g3, t3, t0]),
 				"right": PackedVector2Array([g1, g2, t2, t1]),
 				"front": PackedVector2Array([g3, g2, t2, t3]),
@@ -215,6 +223,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 				"outline_color": outline_color,
 				"landmark_name": String(landmark.get("name", "")),
 				"landmark_asset_id": String(landmark.get("asset_id", "")),
+				"landmark_has_import": false,
 				"prefab_id": String(prefab.get("id", "")),
 				"archetype": archetype,
 				"height_px": height_px,
@@ -222,10 +231,25 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 				"bounds": _polygon_bounds(PackedVector2Array([g0, g1, g2, g3, t0, t1, t2, t3]))
 			}
 		)
+		if not landmark.is_empty() and not asset.is_empty():
+			var scene_path: String = String(asset.get("scene_path", ""))
+			if scene_path != "":
+				import_requests.append(
+					{
+						"cell_key": _cell_key(cell),
+						"scene_path": scene_path,
+						"position": (t0 + t1 + t2 + t3) / 4.0,
+						"sort_key": g2.y,
+						"scene_scale": float(asset.get("scene_scale", 1.0)),
+						"offset_x": float(asset.get("scene_offset_x", 0.0)),
+						"offset_y": float(asset.get("scene_offset_y", 0.0))
+					}
+				)
 
 	massing_instances.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return float(a.get("sort_key", 0.0)) < float(b.get("sort_key", 0.0))
 	)
+	_spawn_imported_landmark_scenes(import_requests)
 	queue_redraw()
 
 func _load_massing_profiles() -> Dictionary:
@@ -581,6 +605,54 @@ func _draw_landmark_detail(inst: Dictionary, lod_id: String) -> void:
 
 func get_render_stats() -> Dictionary:
 	return last_render_stats.duplicate(true)
+
+func _clear_imported_landmark_nodes() -> void:
+	for node in imported_landmark_nodes:
+		if is_instance_valid(node):
+			node.queue_free()
+	imported_landmark_nodes.clear()
+
+func _spawn_imported_landmark_scenes(requests: Array) -> void:
+	if requests.is_empty():
+		return
+	for request_v in requests:
+		if typeof(request_v) != TYPE_DICTIONARY:
+			continue
+		var request: Dictionary = request_v
+		var scene_path: String = String(request.get("scene_path", ""))
+		if scene_path == "":
+			continue
+		var res: Resource = load(scene_path)
+		if not (res is PackedScene):
+			continue
+		var packed: PackedScene = res
+		var inst_v: Node = packed.instantiate()
+		if not (inst_v is Node2D):
+			inst_v.queue_free()
+			continue
+		var node2d: Node2D = inst_v
+		var pos: Vector2 = Vector2(request.get("position", Vector2.ZERO))
+		pos.x += float(request.get("offset_x", 0.0))
+		pos.y += float(request.get("offset_y", 0.0))
+		var scale_mult: float = clamp(float(request.get("scene_scale", 1.0)), 0.1, 4.0)
+		node2d.position = pos
+		node2d.scale = Vector2.ONE * scale_mult
+		node2d.z_index = int(request.get("sort_key", 0.0)) + 200
+		add_child(node2d)
+		imported_landmark_nodes.append(node2d)
+		_mark_instance_imported(String(request.get("cell_key", "")))
+
+func _mark_instance_imported(cell_key: String) -> void:
+	if cell_key == "":
+		return
+	for i in range(massing_instances.size()):
+		var item: Dictionary = massing_instances[i]
+		var item_cell_key: String = String(item.get("cell_key", ""))
+		if item_cell_key != cell_key:
+			continue
+		item["landmark_has_import"] = true
+		massing_instances[i] = item
+		return
 
 func _view_cull_rect() -> Rect2:
 	var vp_size: Vector2 = get_viewport_rect().size
