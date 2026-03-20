@@ -106,6 +106,19 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 2. Import this folder: `nyc-city-builder`.
 3. Press `F5` to run.
 
+## Export
+
+- Presets file: `export_presets.cfg`
+- Targets configured:
+  - `Windows Desktop` -> `build/windows/NeonBoroughs.exe`
+  - `Linux/BSD` -> `build/linux/NeonBoroughs.x86_64`
+  - `Web` -> `build/web/index.html`
+- CLI examples:
+  - `godot --headless --path . --export-release "Windows Desktop" build/windows/NeonBoroughs.exe`
+  - `godot --headless --path . --export-release "Linux/BSD" build/linux/NeonBoroughs.x86_64`
+  - `godot --headless --path . --export-release "Web" build/web/index.html`
+- Note: release templates must be installed in Godot for exports to succeed.
+
 ## Legal-Safe Data Pipeline
 
 - Pipeline docs: `tools/pipeline/README.md`
