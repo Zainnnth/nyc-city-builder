@@ -18,12 +18,17 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `4` Industrial
   - `5` Bulldoze
 - Click-and-drag placement on the map.
+- District-seeded procedural blocks from GeoJSON data:
+  - Loads `data/processed/buildings_districted.geojson` if available.
+  - Falls back to `data/raw/sample_buildings.geojson` otherwise.
+  - Seeds zones/building levels by district style profile.
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
   - Population/jobs capacity updates.
   - Money updates from taxes and upkeep.
 - Camera pan with arrow keys.
 - Mouse-wheel zoom.
+- `G` toggles district overlay visualization.
 
 ## Run
 

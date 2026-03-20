@@ -271,3 +271,50 @@ func _is_in_bounds(cell: Vector2i) -> bool:
 
 func _to_index(cell: Vector2i) -> int:
 	return cell.y * columns + cell.x
+
+func apply_district_seed(seed_records: Array[Dictionary]) -> void:
+	for record in seed_records:
+		var cell: Vector2i = record.get("cell", Vector2i(-1, -1))
+		if not _is_in_bounds(cell):
+			continue
+
+		var index := _to_index(cell)
+		if road_by_index[index]:
+			continue
+
+		var zone := _zone_from_seed(record)
+		zone_by_index[index] = zone
+		building_level_by_index[index] = clampi(int(record.get("seed_level", 1)), 1, 3)
+		_ensure_adjacent_road(cell)
+
+	queue_redraw()
+
+func _zone_from_seed(record: Dictionary) -> int:
+	var district_id := String(record.get("district_id", ""))
+	var style_profile := String(record.get("style_profile", "")).to_lower()
+
+	if district_id in ["midtown_core", "financial_district"]:
+		return Tool.COMMERCIAL
+	if "industrial" in style_profile:
+		return Tool.INDUSTRIAL
+	if "tower" in style_profile:
+		return Tool.COMMERCIAL
+	return Tool.RESIDENTIAL
+
+func _ensure_adjacent_road(cell: Vector2i) -> void:
+	var neighbors := [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1)
+	]
+
+	for dir in neighbors:
+		var n := cell + dir
+		if not _is_in_bounds(n):
+			continue
+		var idx := _to_index(n)
+		if zone_by_index[idx] == Tool.BULLDOZE and not road_by_index[idx]:
+			road_by_index[idx] = true
+			building_level_by_index[idx] = 0
+			return
