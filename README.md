@@ -130,6 +130,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Core simulation API snapshots and shape checks
   - State export/import roundtrip
   - District regeneration call path
+- CI:
+  - GitHub Actions workflow at `.github/workflows/smoke.yml`
+  - Runs smoke checks automatically on pushes to `main` and pull requests
 
 ## Legal-Safe Data Pipeline
 
