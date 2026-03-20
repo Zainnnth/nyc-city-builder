@@ -30,6 +30,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `Save City` / `Load City` persist full simulation state (`user://savegame.json`).
   - Save slots: `Slot 1-3` (`user://savegame_1.json` etc).
   - `Autosave` performs rolling slot saves every ~20 seconds.
+  - `Load Latest` loads the newest slot by file timestamp.
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
   - Updates continuously from simulation telemetry.

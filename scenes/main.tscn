@@ -71,6 +71,10 @@ text = "Save City"
 layout_mode = 2
 text = "Load City"
 
+[node name="LoadLatestButton" type="Button" parent="SeedPanel/Panel/VBox/Persistence"]
+layout_mode = 2
+text = "Load Latest"
+
 [node name="SlotSelect" type="OptionButton" parent="SeedPanel/Panel/VBox/Persistence"]
 layout_mode = 2
 

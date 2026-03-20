@@ -381,6 +381,24 @@ func has_slot(slot: int) -> bool:
 		return false
 	return FileAccess.file_exists(SLOT_SAVE_TEMPLATE % slot)
 
+func load_latest_slot() -> int:
+	var latest_slot := -1
+	var latest_time: int = -1
+	for slot in [1, 2, 3]:
+		var path: String = SLOT_SAVE_TEMPLATE % slot
+		if not FileAccess.file_exists(path):
+			continue
+		var modified: int = FileAccess.get_modified_time(path)
+		if modified > latest_time:
+			latest_time = modified
+			latest_slot = slot
+	if latest_slot == -1:
+		return -1
+	var ok := load_from_slot(latest_slot)
+	if not ok:
+		return -1
+	return latest_slot
+
 func _rebuild_overlay_from_city_grid() -> void:
 	overlay_blocks.clear()
 	district_focus_points.clear()
