@@ -1,0 +1,82 @@
+{
+  "assets": {
+    "empire_state_proxy": {
+      "display_name": "Empire State Proxy",
+      "height_mult": 1.35,
+      "accent_tint": "#f8cf8d",
+      "wall_tint": "#9ab4d3",
+      "roof_tint": "#ffd8a5",
+      "has_antenna": true,
+      "stripe_count_lod0": 4,
+      "lod_rules": {
+        "lod0_max_zoom": 0.82,
+        "lod1_max_zoom": 1.48
+      }
+    },
+    "chrysler_proxy": {
+      "display_name": "Chrysler Proxy",
+      "height_mult": 1.25,
+      "accent_tint": "#ffd9aa",
+      "wall_tint": "#a4b6d0",
+      "roof_tint": "#ffe3c1",
+      "has_antenna": true,
+      "stripe_count_lod0": 5,
+      "lod_rules": {
+        "lod0_max_zoom": 0.86,
+        "lod1_max_zoom": 1.46
+      }
+    },
+    "fidi_crown_proxy": {
+      "display_name": "FiDi Crown Proxy",
+      "height_mult": 1.3,
+      "accent_tint": "#e9b482",
+      "wall_tint": "#93abc8",
+      "roof_tint": "#f8c792",
+      "has_antenna": false,
+      "stripe_count_lod0": 3,
+      "lod_rules": {
+        "lod0_max_zoom": 0.8,
+        "lod1_max_zoom": 1.42
+      }
+    },
+    "les_neon_hub_proxy": {
+      "display_name": "LES Neon Hub Proxy",
+      "height_mult": 1.08,
+      "accent_tint": "#ffaf87",
+      "wall_tint": "#96a6be",
+      "roof_tint": "#f3b98f",
+      "has_antenna": false,
+      "stripe_count_lod0": 2,
+      "lod_rules": {
+        "lod0_max_zoom": 0.78,
+        "lod1_max_zoom": 1.4
+      }
+    },
+    "harlem_hall_proxy": {
+      "display_name": "Harlem Hall Proxy",
+      "height_mult": 1.05,
+      "accent_tint": "#e3a783",
+      "wall_tint": "#909cad",
+      "roof_tint": "#e9b793",
+      "has_antenna": false,
+      "stripe_count_lod0": 2,
+      "lod_rules": {
+        "lod0_max_zoom": 0.78,
+        "lod1_max_zoom": 1.4
+      }
+    },
+    "queens_exchange_proxy": {
+      "display_name": "Queens Exchange Proxy",
+      "height_mult": 1.12,
+      "accent_tint": "#dbb183",
+      "wall_tint": "#8ba2bf",
+      "roof_tint": "#efc59b",
+      "has_antenna": false,
+      "stripe_count_lod0": 3,
+      "lod_rules": {
+        "lod0_max_zoom": 0.8,
+        "lod1_max_zoom": 1.42
+      }
+    }
+  }
+}

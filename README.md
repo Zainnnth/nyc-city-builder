@@ -40,6 +40,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - District-tinted cel-style shading pass for quick skyline readability
     - Landmark pack v0 overlays weighted hero proxies by district/archetype
     - Landmark config in `data/runtime/landmark_pack.json`
+    - Hand-authored landmark asset manifest + LOD rules in `data/runtime/landmark_assets.json`
 - In-game seed panel:
   - Enter a seed and click `Apply Seed` to regenerate neighborhoods.
   - Click `Randomize` for a new deterministic layout.
@@ -172,6 +173,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - Asset ingest checklist: `docs/ASSET_INGEST_CHECKLIST.md`
 - Massing profile config: `data/runtime/massing_profiles.json`
 - Landmark pack config: `data/runtime/landmark_pack.json`
+- Landmark asset manifest: `data/runtime/landmark_assets.json`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:

@@ -2,6 +2,7 @@
   "landmarks": [
     {
       "name": "Empire State Tower Proxy",
+      "asset_id": "empire_state_proxy",
       "district_ids": ["midtown_core"],
       "archetype_contains": ["tower", "glass"],
       "min_level": 2,
@@ -19,6 +20,7 @@
     },
     {
       "name": "Chrysler Spire Proxy",
+      "asset_id": "chrysler_proxy",
       "district_ids": ["midtown_core"],
       "archetype_contains": ["tower", "marquee"],
       "min_level": 2,
@@ -35,6 +37,7 @@
     },
     {
       "name": "FiDi Crown Proxy",
+      "asset_id": "fidi_crown_proxy",
       "district_ids": ["financial_district"],
       "archetype_contains": ["tower", "stone"],
       "min_level": 2,
@@ -52,6 +55,7 @@
     },
     {
       "name": "LES Neon Hub Proxy",
+      "asset_id": "les_neon_hub_proxy",
       "district_ids": ["lower_east_side"],
       "archetype_contains": ["marquee", "bodega"],
       "min_level": 1,
@@ -68,6 +72,7 @@
     },
     {
       "name": "Harlem Cultural Hall Proxy",
+      "asset_id": "harlem_hall_proxy",
       "district_ids": ["harlem"],
       "archetype_contains": ["cultural", "brownstone"],
       "min_level": 1,
@@ -84,6 +89,7 @@
     },
     {
       "name": "Queens Exchange Hub Proxy",
+      "asset_id": "queens_exchange_proxy",
       "district_ids": ["queens_west"],
       "archetype_contains": ["warehouse", "conversion", "glass"],
       "min_level": 1,

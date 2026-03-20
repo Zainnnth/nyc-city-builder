@@ -67,7 +67,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [ ] NYC building dataset ingest for footprint + height + district tagging
 - [x] Procedural massing generator (footprint -> lowpoly mesh kit) for fast coverage
 - [x] Landmark placement rules v0 (weighted district/archetype proxies)
-- [ ] Hand-authored landmark pack (hero buildings) with LODs
+- [x] Hand-authored landmark pack v0 (hero proxies + LOD tiers)
 - [ ] Cel-shaded material/shader pass for late-90s/early-2000s look
 - [ ] District-based prefab set assignment and weighted spawn rules
 - [ ] Godot import presets + optimization (LODs, occlusion, batching checks)
