@@ -22,6 +22,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Loads `data/processed/buildings_districted.geojson` if available.
   - Falls back to `data/raw/sample_buildings.geojson` otherwise.
   - Seeds zones/building levels by district style profile.
+  - Expands clusters using `data/runtime/style_profiles.json`.
+  - Deterministic generation via `DistrictGenerator.world_seed`.
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
   - Population/jobs capacity updates.

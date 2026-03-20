@@ -1,0 +1,34 @@
+{
+  "profiles": {
+    "towers_signage_density_high": {
+      "seed_level_bias": 0.8,
+      "spread_radius": 2,
+      "infill_chance": 0.58
+    },
+    "historic_core_tower_mix": {
+      "seed_level_bias": 0.5,
+      "spread_radius": 2,
+      "infill_chance": 0.46
+    },
+    "midrise_signage_density_medium": {
+      "seed_level_bias": 0.2,
+      "spread_radius": 2,
+      "infill_chance": 0.42
+    },
+    "brownstone_mix_cultural_landmark_bias": {
+      "seed_level_bias": -0.1,
+      "spread_radius": 1,
+      "infill_chance": 0.34
+    },
+    "industrial_to_residential_transition": {
+      "seed_level_bias": 0.1,
+      "spread_radius": 2,
+      "infill_chance": 0.37
+    },
+    "default_mixed": {
+      "seed_level_bias": 0.0,
+      "spread_radius": 1,
+      "infill_chance": 0.22
+    }
+  }
+}

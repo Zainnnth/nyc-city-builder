@@ -54,6 +54,8 @@ var is_drag_painting := false
 var zone_by_index: Array[int] = []
 var road_by_index: Array[bool] = []
 var building_level_by_index: Array[int] = []
+var district_id_by_index: Array[String] = []
+var style_profile_by_index: Array[String] = []
 
 var sim_timer := 0.0
 const SIM_STEP_SECONDS := 1.0
@@ -64,6 +66,15 @@ var jobs := 0
 var connected_residential := 0
 var connected_commercial := 0
 var connected_industrial := 0
+
+const DISTRICT_TINTS := {
+	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
+	"financial_district": Color(0.96, 0.79, 0.60, 1.0),
+	"lower_east_side": Color(0.70, 0.82, 0.98, 1.0),
+	"harlem": Color(0.68, 0.90, 0.76, 1.0),
+	"queens_west": Color(0.84, 0.76, 0.97, 1.0),
+	"outer_borough_mix": Color(0.85, 0.87, 0.92, 1.0)
+}
 
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
@@ -124,7 +135,18 @@ func _draw_tile(rect: Rect2, index: int) -> void:
 	if building_level > 0:
 		var margin := 18.0 - float(building_level * 3)
 		margin = clamp(margin, 6.0, 16.0)
-		draw_rect(rect.grow(-margin), BUILDING_COLOR, true)
+		draw_rect(rect.grow(-margin), _building_color_for(index), true)
+
+func _building_color_for(index: int) -> Color:
+	var district_id: String = district_id_by_index[index]
+	var district_tint: Color = DISTRICT_TINTS.get(district_id, DISTRICT_TINTS["outer_borough_mix"])
+	var style_profile: String = style_profile_by_index[index]
+
+	if style_profile.find("industrial") != -1:
+		return district_tint.darkened(0.2)
+	if style_profile.find("brownstone") != -1:
+		return district_tint.darkened(0.1)
+	return district_tint
 
 func _draw_hud(map_size: Vector2) -> void:
 	var text := "Tool: %s   |   Money: $%d   |   Pop: %d   |   Jobs: %d" % [
@@ -260,11 +282,15 @@ func _init_tiles() -> void:
 	zone_by_index.clear()
 	road_by_index.clear()
 	building_level_by_index.clear()
+	district_id_by_index.clear()
+	style_profile_by_index.clear()
 
 	for i in columns * rows:
 		zone_by_index.append(Tool.BULLDOZE)
 		road_by_index.append(false)
 		building_level_by_index.append(0)
+		district_id_by_index.append("outer_borough_mix")
+		style_profile_by_index.append("default_mixed")
 
 func _is_in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < columns and cell.y < rows
@@ -283,8 +309,12 @@ func apply_district_seed(seed_records: Array[Dictionary]) -> void:
 			continue
 
 		var zone := _zone_from_seed(record)
+		var district_id: String = String(record.get("district_id", "outer_borough_mix"))
+		var style_profile: String = String(record.get("style_profile", "default_mixed"))
 		zone_by_index[index] = zone
 		building_level_by_index[index] = clampi(int(record.get("seed_level", 1)), 1, 3)
+		district_id_by_index[index] = district_id
+		style_profile_by_index[index] = style_profile
 		_ensure_adjacent_road(cell)
 
 	queue_redraw()
