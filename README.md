@@ -34,6 +34,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Seeds zones/building levels by district style profile.
   - Expands clusters using `data/runtime/style_profiles.json`.
   - Deterministic generation via `DistrictGenerator.world_seed`.
+  - Procedural massing layer (2.5D):
+    - Runtime-generated block forms from seeded records (no external meshes required)
+    - Style-driven shaping from `data/runtime/massing_profiles.json`
+    - District-tinted cel-style shading pass for quick skyline readability
 - In-game seed panel:
   - Enter a seed and click `Apply Seed` to regenerate neighborhoods.
   - Click `Randomize` for a new deterministic layout.
@@ -164,6 +168,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - District config: `tools/pipeline/config/district_profiles.json`
 - Asset source policy: `docs/ASSET_POLICY.md`
 - Asset ingest checklist: `docs/ASSET_INGEST_CHECKLIST.md`
+- Massing profile config: `data/runtime/massing_profiles.json`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:

@@ -19,6 +19,7 @@ func _initialize() -> void:
 	var district_generator: Node = main.get_node_or_null("DistrictGenerator")
 	var seed_panel: Node = main.get_node_or_null("SeedPanel")
 	var audio_bed: Node = main.get_node_or_null("AudioBed")
+	var massing_layer: Node = main.get_node_or_null("MassingLayer")
 
 	if city_grid == null:
 		failures.append("Missing node: CityGrid")
@@ -28,6 +29,8 @@ func _initialize() -> void:
 		failures.append("Missing node: SeedPanel")
 	if audio_bed == null:
 		failures.append("Missing node: AudioBed")
+	if massing_layer == null:
+		failures.append("Missing node: MassingLayer")
 
 	if failures.is_empty() and city_grid != null:
 		_check_city_grid_api(city_grid, failures)

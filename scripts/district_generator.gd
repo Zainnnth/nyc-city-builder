@@ -1,5 +1,7 @@
 extends Node2D
 
+signal seed_records_generated(seed_records: Array, world_seed: int)
+
 @export var city_grid_path: NodePath = ^"../CityGrid"
 @export var processed_geojson_path := "res://data/processed/buildings_districted.geojson"
 @export var fallback_geojson_path := "res://data/raw/sample_buildings.geojson"
@@ -17,6 +19,7 @@ var district_identity_profiles: Dictionary = {}
 var balance_profiles: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var district_focus_points: Dictionary = {}
+var last_seed_records: Array[Dictionary] = []
 const DEFAULT_SAVE_PATH := "user://savegame.json"
 const SLOT_SAVE_TEMPLATE := "user://savegame_%d.json"
 
@@ -378,6 +381,7 @@ func regenerate(new_seed: int = -1, initial_load: bool = false) -> void:
 	_apply_identity_profiles_to_city_grid()
 	_apply_balance_profiles_to_city_grid()
 	_build_overlay(seeded)
+	_update_seed_records(seeded)
 	queue_redraw()
 
 func save_to_file(path: String = DEFAULT_SAVE_PATH) -> bool:
@@ -429,6 +433,7 @@ func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	if not ok:
 		return false
 	_rebuild_overlay_from_city_grid()
+	_update_seed_records(_seed_records_from_city_grid())
 	queue_redraw()
 	return true
 
@@ -500,3 +505,74 @@ func _rebuild_overlay_from_city_grid() -> void:
 			continue
 		var avg_local: Vector2 = Vector2(bucket["sum"]) / float(count)
 		district_focus_points[district_id] = avg_local + position
+
+func get_seed_records_snapshot() -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	for item in last_seed_records:
+		output.append(item.duplicate(true))
+	return output
+
+func _update_seed_records(seed_records: Array) -> void:
+	last_seed_records.clear()
+	for record_v in seed_records:
+		if typeof(record_v) != TYPE_DICTIONARY:
+			continue
+		var record: Dictionary = record_v
+		last_seed_records.append(record.duplicate(true))
+	seed_records_generated.emit(get_seed_records_snapshot(), int(world_seed))
+
+func _seed_records_from_city_grid() -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	if city_grid == null:
+		return output
+
+	var columns: int = int(city_grid.get("columns"))
+	var rows: int = int(city_grid.get("rows"))
+	var zones_v: Variant = city_grid.get("zone_by_index")
+	var roads_v: Variant = city_grid.get("road_by_index")
+	var levels_v: Variant = city_grid.get("building_level_by_index")
+	var districts_v: Variant = city_grid.get("district_id_by_index")
+	var styles_v: Variant = city_grid.get("style_profile_by_index")
+	var archetypes_v: Variant = city_grid.get("archetype_by_index")
+	if typeof(zones_v) != TYPE_ARRAY:
+		return output
+	if typeof(roads_v) != TYPE_ARRAY:
+		return output
+	if typeof(levels_v) != TYPE_ARRAY:
+		return output
+	if typeof(districts_v) != TYPE_ARRAY:
+		return output
+	if typeof(styles_v) != TYPE_ARRAY:
+		return output
+	if typeof(archetypes_v) != TYPE_ARRAY:
+		return output
+
+	var zones: Array = zones_v
+	var roads: Array = roads_v
+	var levels: Array = levels_v
+	var districts: Array = districts_v
+	var styles: Array = styles_v
+	var archetypes: Array = archetypes_v
+
+	for y in range(rows):
+		for x in range(columns):
+			var idx := y * columns + x
+			if idx < 0 or idx >= zones.size():
+				continue
+			if bool(roads[idx]):
+				continue
+			if int(zones[idx]) == BULLDOZE_ZONE:
+				continue
+			var level: int = int(levels[idx])
+			if level <= 0:
+				continue
+			output.append(
+				{
+					"cell": Vector2i(x, y),
+					"district_id": String(districts[idx]),
+					"style_profile": String(styles[idx]),
+					"seed_level": level,
+					"archetype": String(archetypes[idx])
+				}
+			)
+	return output

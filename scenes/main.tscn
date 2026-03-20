@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://dxv43pylos7s4"]
+[gd_scene load_steps=7 format=3 uid="uid://dxv43pylos7s4"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_m2tlq"]
 [ext_resource type="Script" path="res://scripts/city_grid.gd" id="2_2s0fj"]
 [ext_resource type="Script" path="res://scripts/district_generator.gd" id="3_lk2hu"]
 [ext_resource type="Script" path="res://scripts/seed_panel.gd" id="4_nd1mf"]
 [ext_resource type="Script" path="res://scripts/audio_bed.gd" id="5_t5x4a"]
+[ext_resource type="Script" path="res://scripts/massing_layer.gd" id="6_nwop3"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_m2tlq")
@@ -17,6 +18,10 @@ enabled = true
 [node name="CityGrid" type="Node2D" parent="."]
 position = Vector2(200, 120)
 script = ExtResource("2_2s0fj")
+
+[node name="MassingLayer" type="Node2D" parent="."]
+position = Vector2(200, 120)
+script = ExtResource("6_nwop3")
 
 [node name="DistrictGenerator" type="Node2D" parent="."]
 position = Vector2(200, 120)

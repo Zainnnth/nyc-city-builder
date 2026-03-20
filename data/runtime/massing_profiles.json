@@ -1,0 +1,58 @@
+{
+  "profiles": {
+    "towers_signage_density_high": {
+      "inset_px": 8.0,
+      "height_per_level": 24.0,
+      "height_jitter": 8.0,
+      "iso_skew_x": 0.40,
+      "iso_skew_y": 1.02,
+      "roof_tint": "#f0c08a",
+      "wall_tint": "#9ab0d0"
+    },
+    "historic_core_tower_mix": {
+      "inset_px": 9.0,
+      "height_per_level": 21.0,
+      "height_jitter": 6.0,
+      "iso_skew_x": 0.41,
+      "iso_skew_y": 1.0,
+      "roof_tint": "#d5a67f",
+      "wall_tint": "#98a8c1"
+    },
+    "midrise_signage_density_medium": {
+      "inset_px": 10.0,
+      "height_per_level": 18.0,
+      "height_jitter": 5.0,
+      "iso_skew_x": 0.42,
+      "iso_skew_y": 1.0,
+      "roof_tint": "#cf9e7a",
+      "wall_tint": "#8da0bc"
+    },
+    "brownstone_mix_cultural_landmark_bias": {
+      "inset_px": 11.0,
+      "height_per_level": 14.0,
+      "height_jitter": 3.0,
+      "iso_skew_x": 0.43,
+      "iso_skew_y": 0.98,
+      "roof_tint": "#b98666",
+      "wall_tint": "#8e8f9e"
+    },
+    "industrial_to_residential_transition": {
+      "inset_px": 10.0,
+      "height_per_level": 16.0,
+      "height_jitter": 4.0,
+      "iso_skew_x": 0.44,
+      "iso_skew_y": 0.96,
+      "roof_tint": "#c49370",
+      "wall_tint": "#7f8ea7"
+    },
+    "default_mixed": {
+      "inset_px": 10.0,
+      "height_per_level": 18.0,
+      "height_jitter": 5.0,
+      "iso_skew_x": 0.42,
+      "iso_skew_y": 1.0,
+      "roof_tint": "#d8b691",
+      "wall_tint": "#8aa0bf"
+    }
+  }
+}
