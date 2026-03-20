@@ -71,6 +71,13 @@ text = "Save City"
 layout_mode = 2
 text = "Load City"
 
+[node name="SlotSelect" type="OptionButton" parent="SeedPanel/Panel/VBox/Persistence"]
+layout_mode = 2
+
+[node name="AutosaveToggle" type="CheckBox" parent="SeedPanel/Panel/VBox/Persistence"]
+layout_mode = 2
+text = "Autosave"
+
 [node name="StatusLabel" type="Label" parent="SeedPanel/Panel/VBox"]
 layout_mode = 2
 text = "Ready."

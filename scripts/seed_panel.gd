@@ -10,6 +10,8 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var random_button: Button = $Panel/VBox/Controls/RandomSeedButton
 @onready var save_button: Button = $Panel/VBox/Persistence/SaveButton
 @onready var load_button: Button = $Panel/VBox/Persistence/LoadButton
+@onready var slot_select: OptionButton = $Panel/VBox/Persistence/SlotSelect
+@onready var autosave_toggle: CheckBox = $Panel/VBox/Persistence/AutosaveToggle
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var popup_panel: PanelContainer = $DistrictPopup
@@ -27,6 +29,9 @@ var rng := RandomNumberGenerator.new()
 var ui_timer := 0.0
 var focused_district_id := ""
 var focused_row_data: Dictionary = {}
+var autosave_timer := 0.0
+var autosave_next_slot := 1
+const AUTOSAVE_INTERVAL := 20.0
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -59,18 +64,26 @@ func _ready() -> void:
 	random_button.pressed.connect(_on_random_seed)
 	save_button.pressed.connect(_on_save_city)
 	load_button.pressed.connect(_on_load_city)
+	slot_select.item_selected.connect(_on_slot_changed)
+	autosave_toggle.toggled.connect(_on_autosave_toggled)
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
 	policy_growth_button.pressed.connect(_on_set_policy.bind("growth"))
 	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
 	popup_panel.visible = false
+	_init_slot_ui()
 
 func _process(delta: float) -> void:
 	ui_timer += delta
 	if ui_timer >= 0.4:
 		ui_timer = 0.0
 		_refresh_demand_bars()
+	if autosave_toggle.button_pressed:
+		autosave_timer += delta
+		if autosave_timer >= AUTOSAVE_INTERVAL:
+			autosave_timer = 0.0
+			_run_rolling_autosave()
 
 func _on_text_submitted(_value: String) -> void:
 	_on_apply_seed()
@@ -98,21 +111,23 @@ func _on_random_seed() -> void:
 func _on_save_city() -> void:
 	if district_generator == null:
 		return
-	var ok: bool = district_generator.call("save_to_file")
+	var slot := _current_slot()
+	var ok: bool = district_generator.call("save_to_slot", slot)
 	if ok:
-		status_label.text = "City saved."
+		status_label.text = "City saved to slot %d." % slot
 	else:
 		status_label.text = "Save failed."
 
 func _on_load_city() -> void:
 	if district_generator == null:
 		return
-	var ok: bool = district_generator.call("load_from_file")
+	var slot := _current_slot()
+	var ok: bool = district_generator.call("load_from_slot", slot)
 	if ok:
 		input_seed.text = str(district_generator.call("get_world_seed"))
-		status_label.text = "City loaded."
+		status_label.text = "City loaded from slot %d." % slot
 	else:
-		status_label.text = "Load failed (no save yet?)."
+		status_label.text = "Load failed for slot %d." % slot
 
 func _refresh_demand_bars() -> void:
 	if city_grid == null:
@@ -217,3 +232,58 @@ func _on_set_policy(policy_id: String) -> void:
 	row_data["policy_id"] = policy_id
 	_show_popup(focused_district_id, row_data)
 	status_label.text = "Policy set: %s" % String(POLICY_LABELS.get(policy_id, policy_id))
+
+func _init_slot_ui() -> void:
+	slot_select.clear()
+	slot_select.add_item("Slot 1", 1)
+	slot_select.add_item("Slot 2", 2)
+	slot_select.add_item("Slot 3", 3)
+	slot_select.select(0)
+	autosave_toggle.button_pressed = false
+	autosave_timer = 0.0
+	autosave_next_slot = 1
+	_update_slot_labels()
+
+func _on_slot_changed(_idx: int) -> void:
+	autosave_next_slot = _current_slot()
+	_update_slot_labels()
+
+func _on_autosave_toggled(enabled: bool) -> void:
+	autosave_timer = 0.0
+	if enabled:
+		autosave_next_slot = _current_slot()
+		status_label.text = "Autosave enabled."
+	else:
+		status_label.text = "Autosave disabled."
+
+func _run_rolling_autosave() -> void:
+	if district_generator == null:
+		return
+	var slot: int = autosave_next_slot
+	var ok: bool = district_generator.call("save_to_slot", slot)
+	if ok:
+		status_label.text = "Autosaved slot %d." % slot
+		autosave_next_slot += 1
+		if autosave_next_slot > 3:
+			autosave_next_slot = 1
+	else:
+		status_label.text = "Autosave failed."
+	_update_slot_labels()
+
+func _current_slot() -> int:
+	var idx := slot_select.selected
+	if idx < 0:
+		return 1
+	var id := slot_select.get_item_id(idx)
+	if id < 1 or id > 3:
+		return 1
+	return id
+
+func _update_slot_labels() -> void:
+	if district_generator == null:
+		return
+	for slot in [1, 2, 3]:
+		var exists: bool = district_generator.call("has_slot", slot)
+		var item_idx: int = slot - 1
+		var text: String = "Slot %d%s" % [slot, " *" if exists else ""]
+		slot_select.set_item_text(item_idx, text)

@@ -14,6 +14,7 @@ var style_profiles: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var district_focus_points: Dictionary = {}
 const DEFAULT_SAVE_PATH := "user://savegame.json"
+const SLOT_SAVE_TEMPLATE := "user://savegame_%d.json"
 
 const DISTRICT_COLORS := {
 	"midtown_core": Color(0.94, 0.62, 0.20, 0.38),
@@ -337,6 +338,11 @@ func save_to_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	fp.store_string(JSON.stringify(payload, "  "))
 	return true
 
+func save_to_slot(slot: int) -> bool:
+	if slot < 1 or slot > 3:
+		return false
+	return save_to_file(SLOT_SAVE_TEMPLATE % slot)
+
 func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	if city_grid == null:
 		return false
@@ -364,6 +370,16 @@ func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	_rebuild_overlay_from_city_grid()
 	queue_redraw()
 	return true
+
+func load_from_slot(slot: int) -> bool:
+	if slot < 1 or slot > 3:
+		return false
+	return load_from_file(SLOT_SAVE_TEMPLATE % slot)
+
+func has_slot(slot: int) -> bool:
+	if slot < 1 or slot > 3:
+		return false
+	return FileAccess.file_exists(SLOT_SAVE_TEMPLATE % slot)
 
 func _rebuild_overlay_from_city_grid() -> void:
 	overlay_blocks.clear()
