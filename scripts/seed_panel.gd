@@ -1,5 +1,7 @@
 extends CanvasLayer
 
+signal district_focus_requested(target_pos: Vector2)
+
 @export var district_generator_path: NodePath = ^"../DistrictGenerator"
 @export var city_grid_path: NodePath = ^"../CityGrid"
 
@@ -8,6 +10,10 @@ extends CanvasLayer
 @onready var random_button: Button = $Panel/VBox/Controls/RandomSeedButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
+@onready var popup_panel: PanelContainer = $DistrictPopup
+@onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
+@onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
+@onready var close_popup_button: Button = $DistrictPopup/VBox/ClosePopupButton
 
 var district_generator: Node2D
 var city_grid: Node2D
@@ -38,6 +44,8 @@ func _ready() -> void:
 	apply_button.pressed.connect(_on_apply_seed)
 	random_button.pressed.connect(_on_random_seed)
 	input_seed.text_submitted.connect(_on_text_submitted)
+	close_popup_button.pressed.connect(_on_close_popup)
+	popup_panel.visible = false
 
 func _process(delta: float) -> void:
 	ui_timer += delta
@@ -117,4 +125,37 @@ func _refresh_demand_bars() -> void:
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
 		sub.text = "R %d  C %d  I %d" % [res_d, com_d, ind_d]
 		row.add_child(sub)
+
+		var focus_button: Button = Button.new()
+		focus_button.text = "Focus District"
+		focus_button.pressed.connect(_on_focus_district.bind(district_id, row_data))
+		row.add_child(focus_button)
 		demand_rows.add_child(row)
+
+func _on_focus_district(district_id: String, row_data: Dictionary) -> void:
+	if district_generator == null:
+		return
+	if not district_generator.call("has_district_focus_point", district_id):
+		status_label.text = "No focus point for %s." % district_id
+		return
+
+	var target: Vector2 = district_generator.call("get_district_focus_point", district_id)
+	district_focus_requested.emit(target)
+	_show_popup(district_id, row_data)
+	status_label.text = "Focused %s." % String(DISTRICT_NAMES.get(district_id, district_id))
+
+func _show_popup(district_id: String, row_data: Dictionary) -> void:
+	var district_name: String = String(DISTRICT_NAMES.get(district_id, district_id))
+	var demand: int = int(round(float(row_data.get("demand_index", 0.0))))
+	var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
+	var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
+	var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
+
+	popup_title.text = "%s District" % district_name
+	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d" % [
+		demand, res_d, com_d, ind_d
+	]
+	popup_panel.visible = true
+
+func _on_close_popup() -> void:
+	popup_panel.visible = false

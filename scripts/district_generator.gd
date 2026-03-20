@@ -12,6 +12,7 @@ var overlay_visible := true
 var overlay_blocks: Array[Dictionary] = []
 var style_profiles: Dictionary = {}
 var rng := RandomNumberGenerator.new()
+var district_focus_points: Dictionary = {}
 
 const DISTRICT_COLORS := {
 	"midtown_core": Color(0.94, 0.62, 0.20, 0.38),
@@ -247,17 +248,44 @@ func _key(cell: Vector2i) -> String:
 
 func _build_overlay(seed_records: Array[Dictionary]) -> void:
 	overlay_blocks.clear()
+	district_focus_points.clear()
 	var cell_size := float(city_grid.get("cell_size"))
+	var accum := {}
 
 	for rec in seed_records:
 		var cell: Vector2i = rec["cell"]
-		var district_id := String(rec.get("district_id", "outer_borough_mix"))
+		var district_id: String = String(rec.get("district_id", "outer_borough_mix"))
 		var color: Color = DISTRICT_COLORS.get(district_id, DISTRICT_COLORS["outer_borough_mix"])
 		var rect := Rect2(Vector2(cell.x, cell.y) * cell_size, Vector2.ONE * cell_size)
 		overlay_blocks.append({"rect": rect, "color": color})
 
+		var center_local := Vector2(cell.x + 0.5, cell.y + 0.5) * cell_size
+		if not accum.has(district_id):
+			accum[district_id] = {"sum": Vector2.ZERO, "count": 0}
+		var bucket: Dictionary = accum[district_id]
+		bucket["sum"] = Vector2(bucket["sum"]) + center_local
+		bucket["count"] = int(bucket["count"]) + 1
+		accum[district_id] = bucket
+
+	for district_key in accum.keys():
+		var district_id: String = String(district_key)
+		var bucket: Dictionary = accum[district_id]
+		var count: int = int(bucket.get("count", 0))
+		if count <= 0:
+			continue
+		var avg_local: Vector2 = Vector2(bucket["sum"]) / float(count)
+		district_focus_points[district_id] = avg_local + position
+
 func get_world_seed() -> int:
 	return int(world_seed)
+
+func has_district_focus_point(district_id: String) -> bool:
+	return district_focus_points.has(district_id)
+
+func get_district_focus_point(district_id: String) -> Vector2:
+	if district_focus_points.has(district_id):
+		return district_focus_points[district_id]
+	return position
 
 func regenerate(new_seed: int = -1, initial_load: bool = false) -> void:
 	if new_seed >= 0:

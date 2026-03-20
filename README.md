@@ -30,6 +30,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
   - Updates continuously from simulation telemetry.
+  - `Focus District` jumps camera to that neighborhood cluster.
+  - Opens district detail popup with demand breakdown.
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
   - Population/jobs capacity updates.

@@ -79,3 +79,25 @@ text = "District Demand Index"
 
 [node name="DemandRows" type="VBoxContainer" parent="SeedPanel/DemandPanel/VBox"]
 layout_mode = 2
+
+[node name="DistrictPopup" type="PanelContainer" parent="SeedPanel"]
+offset_left = 398.0
+offset_top = 14.0
+offset_right = 664.0
+offset_bottom = 210.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/DistrictPopup"]
+layout_mode = 2
+
+[node name="PopupTitle" type="Label" parent="SeedPanel/DistrictPopup/VBox"]
+layout_mode = 2
+text = "District"
+
+[node name="PopupBody" type="Label" parent="SeedPanel/DistrictPopup/VBox"]
+layout_mode = 2
+text = "Demand details."
+
+[node name="ClosePopupButton" type="Button" parent="SeedPanel/DistrictPopup/VBox"]
+layout_mode = 2
+text = "Close"
