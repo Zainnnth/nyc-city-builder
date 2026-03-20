@@ -50,6 +50,6 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 ## Phase 5 - Authoring and Scale
 
 - [x] Scenario authoring pack (goal cards + parameter presets)
-- [ ] Performance pass for larger grids and longer sessions
-- [ ] Release automation for tagged builds
-- [ ] Deterministic simulation assertions expansion
+- [x] Performance pass for larger grids and longer sessions
+- [x] Release automation for tagged builds
+- [x] Deterministic simulation assertions expansion

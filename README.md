@@ -142,6 +142,20 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - CI:
   - GitHub Actions workflow at `.github/workflows/smoke.yml`
   - Runs smoke checks automatically on pushes to `main` and pull requests
+  - Includes deterministic seeded simulation signature assertions
+
+## Release Automation
+
+- Workflow: `.github/workflows/release.yml`
+- Trigger:
+  - Push tag matching `v*` (example: `v0.1.0`)
+  - Manual `workflow_dispatch`
+- Output artifacts:
+  - `neon-boroughs-windows.zip`
+  - `neon-boroughs-linux.tar.gz`
+  - `neon-boroughs-web.zip`
+  - `SHA256SUMS.txt`
+- Artifacts are attached to the GitHub Release for matching tags.
 
 ## Legal-Safe Data Pipeline
 
@@ -168,7 +182,7 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Performance pass for larger grids and longer sessions.
-2. Release automation to export and upload build artifacts on tags.
-3. Expanded deterministic simulation assertions in smoke harness.
-4. Goal-card win/loss validation hooks in simulation objectives.
+1. Goal-card win/loss validation hooks in simulation objectives.
+2. Difficulty scaling by district era/theme progression.
+3. Save migration/versioning hardening for future schema changes.
+4. Optional benchmark scene for large-grid perf telemetry.

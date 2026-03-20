@@ -51,6 +51,12 @@ const TOOL_KEYS := {
 	KEY_4: Tool.INDUSTRIAL,
 	KEY_5: Tool.BULLDOZE
 }
+const ORTHO_DIRECTIONS := [
+	Vector2i(1, 0),
+	Vector2i(-1, 0),
+	Vector2i(0, 1),
+	Vector2i(0, -1)
+]
 
 var selected_tool: Tool = Tool.ROAD
 var is_drag_painting := false
@@ -223,6 +229,14 @@ var overlay_alpha := 0.42
 var atmosphere_time := 0.0
 var atmosphere_redraw_accum := 0.0
 const ATMOSPHERE_REDRAW_STEP := 0.16
+var road_graph_dirty := true
+var cached_road_graph := {
+	"component_by_index": [],
+	"component_sizes": [],
+	"component_count": 0,
+	"largest_cluster": 0,
+	"road_count": 0
+}
 
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
@@ -516,24 +530,31 @@ func _paint_at_mouse_position() -> void:
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
 				archetype_by_index[index] = "road_segment"
+				_mark_road_topology_dirty()
 				money -= 8
 				stroke_dirty = true
 		Tool.BULLDOZE:
 			if road_by_index[index] or zone_by_index[index] != Tool.BULLDOZE or building_level_by_index[index] > 0:
 				_mark_edit_if_needed()
+				var was_road: bool = road_by_index[index]
 				road_by_index[index] = false
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
 				archetype_by_index[index] = "vacant_lot"
+				if was_road:
+					_mark_road_topology_dirty()
 				money -= 3
 				stroke_dirty = true
 		_:
 			if zone_by_index[index] != selected_tool or road_by_index[index]:
 				_mark_edit_if_needed()
+				var had_road: bool = road_by_index[index]
 				road_by_index[index] = false
 				zone_by_index[index] = selected_tool
 				building_level_by_index[index] = 0
 				archetype_by_index[index] = _default_archetype_for_cell(index, selected_tool)
+				if had_road:
+					_mark_road_topology_dirty()
 				money -= 5
 				stroke_dirty = true
 
@@ -548,7 +569,7 @@ func _run_sim_step() -> void:
 	var service_upkeep_cost := 0.0
 	var tax_income_raw := 0.0
 	var district_stats := {}
-	var road_graph: Dictionary = _build_road_graph_metrics()
+	var road_graph: Dictionary = _get_road_graph_metrics()
 	var component_by_index: Array = road_graph.get("component_by_index", [])
 	var component_sizes: Array = road_graph.get("component_sizes", [])
 	var component_penalties: Dictionary = _build_component_commute_penalties(component_by_index, component_sizes)
@@ -724,18 +745,20 @@ func _run_sim_step() -> void:
 	_update_active_alerts()
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
-	var neighbors := [
-		Vector2i(1, 0),
-		Vector2i(-1, 0),
-		Vector2i(0, 1),
-		Vector2i(0, -1)
-	]
-
-	for dir in neighbors:
+	for dir in ORTHO_DIRECTIONS:
 		var n: Vector2i = cell + dir
 		if _is_in_bounds(n) and road_by_index[_to_index(n)]:
 			return true
 	return false
+
+func _mark_road_topology_dirty() -> void:
+	road_graph_dirty = true
+
+func _get_road_graph_metrics() -> Dictionary:
+	if road_graph_dirty:
+		cached_road_graph = _build_road_graph_metrics()
+		road_graph_dirty = false
+	return cached_road_graph
 
 func _build_road_graph_metrics() -> Dictionary:
 	var total_cells := columns * rows
@@ -794,13 +817,7 @@ func _flood_fill_road_component(start_cell: Vector2i, component_id: int, compone
 	return size
 
 func _adjacent_road_component(cell: Vector2i, component_by_index: Array) -> int:
-	var neighbors := [
-		Vector2i(1, 0),
-		Vector2i(-1, 0),
-		Vector2i(0, 1),
-		Vector2i(0, -1)
-	]
-	for dir in neighbors:
+	for dir in ORTHO_DIRECTIONS:
 		var n: Vector2i = cell + dir
 		if not _is_in_bounds(n):
 			continue
@@ -886,6 +903,7 @@ func _init_tiles() -> void:
 		land_value_by_index.append(30.0)
 		noise_by_index.append(10.0)
 		crime_by_index.append(10.0)
+	_mark_road_topology_dirty()
 
 func _is_in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < columns and cell.y < rows
@@ -938,6 +956,7 @@ func reset_grid() -> void:
 	queue_redraw()
 
 func apply_district_seed(seed_records: Array[Dictionary]) -> void:
+	var seeded_road_change := false
 	for record in seed_records:
 		var cell: Vector2i = record.get("cell", Vector2i(-1, -1))
 		if not _is_in_bounds(cell):
@@ -958,8 +977,11 @@ func apply_district_seed(seed_records: Array[Dictionary]) -> void:
 		archetype_by_index[index] = archetype
 		if not district_policy_map.has(district_id):
 			district_policy_map[district_id] = POLICY_BALANCED
-		_ensure_adjacent_road(cell)
+		if _ensure_adjacent_road(cell):
+			seeded_road_change = true
 
+	if seeded_road_change:
+		_mark_road_topology_dirty()
 	queue_redraw()
 
 func _zone_from_seed(record: Dictionary) -> int:
@@ -974,15 +996,8 @@ func _zone_from_seed(record: Dictionary) -> int:
 		return Tool.COMMERCIAL
 	return Tool.RESIDENTIAL
 
-func _ensure_adjacent_road(cell: Vector2i) -> void:
-	var neighbors := [
-		Vector2i(1, 0),
-		Vector2i(-1, 0),
-		Vector2i(0, 1),
-		Vector2i(0, -1)
-	]
-
-	for dir in neighbors:
+func _ensure_adjacent_road(cell: Vector2i) -> bool:
+	for dir in ORTHO_DIRECTIONS:
 		var n: Vector2i = cell + dir
 		if not _is_in_bounds(n):
 			continue
@@ -993,7 +1008,8 @@ func _ensure_adjacent_road(cell: Vector2i) -> void:
 			style_profile_by_index[idx] = style_profile_by_index[_to_index(cell)]
 			archetype_by_index[idx] = "road_segment"
 			building_level_by_index[idx] = 0
-			return
+			return true
+	return false
 
 func _growth_multiplier(style_profile: String) -> float:
 	if style_profile.find("tower") != -1:
@@ -1695,6 +1711,7 @@ func import_state(state: Dictionary) -> bool:
 	sim_timer = 0.0
 	atmosphere_time = 0.0
 	atmosphere_redraw_accum = 0.0
+	_mark_road_topology_dirty()
 	queue_redraw()
 	return true
 
@@ -2040,3 +2057,4 @@ func _restore_edit_state(state: Dictionary) -> void:
 		crime_by_index.append(float(crime_values[i]))
 
 	money = int(state.get("money", money))
+	_mark_road_topology_dirty()

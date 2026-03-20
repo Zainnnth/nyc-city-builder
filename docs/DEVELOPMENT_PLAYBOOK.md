@@ -37,7 +37,7 @@ A change is ready only if:
 
 ## Suggested Next Backlog
 
-- Performance pass for large-grid simulation.
-- More deterministic simulation tests.
-- Release workflow with export artifacts on tags.
 - Goal-card completion conditions integrated into objective system.
+- Difficulty scaling pass (era-themed progression pressure).
+- Save migration/versioning compatibility tests.
+- Optional benchmark harness for large-grid frame/tick budgets.

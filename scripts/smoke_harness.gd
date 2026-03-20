@@ -36,6 +36,8 @@ func _initialize() -> void:
 
 	if failures.is_empty() and district_generator != null:
 		_check_generator_api(district_generator, failures)
+		if city_grid != null:
+			_check_deterministic_simulation(city_grid, district_generator, failures)
 
 	if failures.is_empty():
 		print("[SMOKE] PASS: core systems booted and API checks passed.")
@@ -105,6 +107,61 @@ func _check_generator_api(district_generator: Node, failures: Array[String]) -> 
 		failures.append("DistrictGenerator missing method: regenerate")
 		return
 	district_generator.call("regenerate", 1998, false)
+
+func _check_deterministic_simulation(city_grid: Node, district_generator: Node, failures: Array[String]) -> void:
+	var run_a: Dictionary = _run_seeded_signature(city_grid, district_generator, 1998)
+	var run_b: Dictionary = _run_seeded_signature(city_grid, district_generator, 1998)
+	if run_a != run_b:
+		failures.append("Deterministic signature mismatch for repeated seeded run")
+		return
+	if int(run_a.get("population", 0)) <= 0:
+		failures.append("Deterministic run did not produce population growth")
+
+func _run_seeded_signature(city_grid: Node, district_generator: Node, seed_value: int) -> Dictionary:
+	district_generator.call("regenerate", seed_value, false)
+	city_grid.call("set_balance_profile", "standard")
+	city_grid.call("set_service_level", "police", 60.0)
+	city_grid.call("set_service_level", "fire", 60.0)
+	city_grid.call("set_service_level", "sanitation", 60.0)
+	city_grid.call("set_service_level", "transit", 60.0)
+	for _step in range(8):
+		city_grid.call("_run_sim_step")
+
+	var econ: Dictionary = city_grid.call("get_economy_snapshot")
+	var overlay: Dictionary = city_grid.call("get_overlay_metrics")
+	var roads: Dictionary = city_grid.call("get_road_metrics")
+	var demand: Array = city_grid.call("get_district_demand_snapshot")
+	var demand_head: Array = []
+	var sample_count: int = min(3, demand.size())
+	for i in range(sample_count):
+		var row_v: Variant = demand[i]
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		demand_head.append(
+			{
+				"district_id": String(row.get("district_id", "")),
+				"demand_index": _round3(float(row.get("demand_index", 0.0))),
+				"traffic_stress": _round3(float(row.get("traffic_stress", 0.0))),
+				"service_stress": _round3(float(row.get("service_stress", 0.0)))
+			}
+		)
+
+	return {
+		"money": int(econ.get("money", 0)),
+		"population": int(econ.get("population", 0)),
+		"jobs": int(econ.get("jobs", 0)),
+		"avg_land_value": _round3(float(overlay.get("avg_land_value", 0.0))),
+		"avg_noise": _round3(float(overlay.get("avg_noise", 0.0))),
+		"avg_crime": _round3(float(overlay.get("avg_crime", 0.0))),
+		"avg_commute_penalty": _round3(float(overlay.get("avg_commute_penalty", 0.0))),
+		"road_clusters": int(roads.get("cluster_count", 0)),
+		"largest_cluster": int(roads.get("largest_cluster", 0)),
+		"demand_head": demand_head
+	}
+
+func _round3(value: float) -> float:
+	return snappedf(value, 0.001)
 
 func _fail_and_quit(failures: Array[String]) -> void:
 	for failure in failures:
