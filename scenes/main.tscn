@@ -258,6 +258,30 @@ text = "City Alerts"
 [node name="AlertRows" type="VBoxContainer" parent="SeedPanel/AlertsPanel/VBox"]
 layout_mode = 2
 
+[node name="OverlayPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 676.0
+offset_top = 136.0
+offset_right = 980.0
+offset_bottom = 236.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/OverlayPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/OverlayPanel/VBox"]
+layout_mode = 2
+text = "Overlays"
+
+[node name="OverlayRow" type="HBoxContainer" parent="SeedPanel/OverlayPanel/VBox"]
+layout_mode = 2
+
+[node name="OverlaySelect" type="OptionButton" parent="SeedPanel/OverlayPanel/VBox/OverlayRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OverlayStats" type="Label" parent="SeedPanel/OverlayPanel/VBox"]
+layout_mode = 2
+text = "Land 0.0  Noise 0.0  Crime 0.0  Commute 0.0"
+
 [node name="ObjectivesPanel" type="PanelContainer" parent="SeedPanel"]
 offset_left = 398.0
 offset_top = 370.0

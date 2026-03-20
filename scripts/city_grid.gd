@@ -58,6 +58,9 @@ var road_by_index: Array[bool] = []
 var building_level_by_index: Array[int] = []
 var district_id_by_index: Array[String] = []
 var style_profile_by_index: Array[String] = []
+var land_value_by_index: Array[float] = []
+var noise_by_index: Array[float] = []
+var crime_by_index: Array[float] = []
 var undo_stack: Array[Dictionary] = []
 var redo_stack: Array[Dictionary] = []
 const MAX_EDIT_HISTORY := 60
@@ -86,6 +89,9 @@ var road_cluster_count := 0
 var largest_road_cluster := 0
 var road_efficiency := 1.0
 var avg_commute_penalty := 0.0
+var avg_land_value := 0.0
+var avg_noise := 0.0
+var avg_crime := 0.0
 var service_levels := {
 	"police": 55.0,
 	"fire": 55.0,
@@ -148,6 +154,14 @@ const OBJECTIVES := [
 	{"id": "cash_12000", "title": "Reach treasury $12,000"},
 	{"id": "cashflow_20", "title": "Maintain positive cashflow for 20 ticks"}
 ]
+
+const OVERLAY_NONE := "none"
+const OVERLAY_LAND_VALUE := "land_value"
+const OVERLAY_NOISE := "noise"
+const OVERLAY_CRIME := "crime"
+
+var overlay_mode := OVERLAY_NONE
+var overlay_alpha := 0.42
 
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
@@ -222,6 +236,28 @@ func _draw_tile(rect: Rect2, index: int) -> void:
 		var margin := 18.0 - float(building_level * 3)
 		margin = clamp(margin, 6.0, 16.0)
 		draw_rect(rect.grow(-margin), _building_color_for(index), true)
+
+	_draw_overlay(rect, index)
+
+func _draw_overlay(rect: Rect2, index: int) -> void:
+	if overlay_mode == OVERLAY_NONE:
+		return
+	if road_by_index[index]:
+		return
+
+	var value := 0.0
+	var color := Color(1, 1, 1, overlay_alpha)
+	if overlay_mode == OVERLAY_LAND_VALUE:
+		value = clamp(land_value_by_index[index] / 100.0, 0.0, 1.0)
+		color = Color(0.15, 0.85, 0.34, overlay_alpha * value)
+	elif overlay_mode == OVERLAY_NOISE:
+		value = clamp(noise_by_index[index] / 100.0, 0.0, 1.0)
+		color = Color(0.96, 0.73, 0.24, overlay_alpha * value)
+	elif overlay_mode == OVERLAY_CRIME:
+		value = clamp(crime_by_index[index] / 100.0, 0.0, 1.0)
+		color = Color(0.9, 0.24, 0.24, overlay_alpha * value)
+	if value > 0.01:
+		draw_rect(rect.grow(-2.0), color, true)
 
 func _building_color_for(index: int) -> Color:
 	var district_id: String = district_id_by_index[index]
@@ -334,6 +370,10 @@ func _run_sim_step() -> void:
 	var component_penalties: Dictionary = _build_component_commute_penalties(component_by_index, component_sizes)
 	var penalty_sum := 0.0
 	var penalty_count := 0
+	var land_sum := 0.0
+	var noise_sum := 0.0
+	var crime_sum := 0.0
+	var metric_samples := 0
 	var road_count: int = int(road_graph.get("road_count", 0))
 	road_cluster_count = int(road_graph.get("component_count", 0))
 	largest_road_cluster = int(road_graph.get("largest_cluster", 0))
@@ -350,11 +390,21 @@ func _run_sim_step() -> void:
 
 			if road_by_index[i]:
 				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(district_id_by_index[i])
+				land_value_by_index[i] = 42.0
+				noise_by_index[i] = 26.0
+				crime_by_index[i] = 14.0 + (1.0 - _service_norm("police")) * 18.0
 				continue
 
 			var zone := zone_by_index[i]
 			if zone == Tool.BULLDOZE:
 				building_level_by_index[i] = 0
+				land_value_by_index[i] = 32.0 + _service_norm("sanitation") * 10.0
+				noise_by_index[i] = 14.0
+				crime_by_index[i] = 18.0 + (1.0 - _service_norm("police")) * 16.0
+				land_sum += land_value_by_index[i]
+				noise_sum += noise_by_index[i]
+				crime_sum += crime_by_index[i]
+				metric_samples += 1
 				continue
 
 			var adjacent_component: int = _adjacent_road_component(cell, component_by_index)
@@ -369,6 +419,13 @@ func _run_sim_step() -> void:
 
 			if not connected:
 				building_level_by_index[i] = max(building_level_by_index[i] - 1, 0)
+				land_value_by_index[i] = clamp(24.0 + _service_norm("sanitation") * 9.0 - commute_penalty * 26.0, 0.0, 100.0)
+				noise_by_index[i] = clamp(22.0 + (18.0 if zone == Tool.INDUSTRIAL else 8.0) + commute_penalty * 22.0, 0.0, 100.0)
+				crime_by_index[i] = clamp(34.0 + (1.0 - _service_norm("police")) * 38.0 + commute_penalty * 20.0, 0.0, 100.0)
+				land_sum += land_value_by_index[i]
+				noise_sum += noise_by_index[i]
+				crime_sum += crime_by_index[i]
+				metric_samples += 1
 				district_stats[district_id] = stat
 				continue
 
@@ -407,6 +464,40 @@ func _run_sim_step() -> void:
 			penalty_sum += commute_penalty
 			penalty_count += 1
 
+			var land_base := 48.0
+			if zone == Tool.RESIDENTIAL:
+				land_base = 52.0
+			elif zone == Tool.COMMERCIAL:
+				land_base = 58.0
+			elif zone == Tool.INDUSTRIAL:
+				land_base = 44.0
+			var noise_base := 12.0
+			if zone == Tool.INDUSTRIAL:
+				noise_base = 34.0
+			elif zone == Tool.COMMERCIAL:
+				noise_base = 18.0
+			var police_norm := _service_norm("police")
+			var sanitation_norm := _service_norm("sanitation")
+			var transit_norm := _service_norm("transit")
+			var fire_norm := _service_norm("fire")
+			land_value_by_index[i] = clamp(
+				land_base + float(level) * 5.5 + transit_norm * 10.0 + sanitation_norm * 8.0
+				- commute_penalty * 28.0 - noise_base * 0.15,
+				0.0, 100.0
+			)
+			noise_by_index[i] = clamp(
+				noise_base + commute_penalty * 26.0 + (1.0 - sanitation_norm) * 12.0 + (1.0 - transit_norm) * 6.0,
+				0.0, 100.0
+			)
+			crime_by_index[i] = clamp(
+				16.0 + (1.0 - police_norm) * 44.0 + (1.0 - fire_norm) * 10.0 + commute_penalty * 18.0,
+				0.0, 100.0
+			)
+			land_sum += land_value_by_index[i]
+			noise_sum += noise_by_index[i]
+			crime_sum += crime_by_index[i]
+			metric_samples += 1
+
 	var target_population: int = min(pop_capacity, int(round(job_capacity * 0.9)))
 	population = int(lerp(float(population), float(target_population), 0.42))
 	jobs = int(lerp(float(jobs), float(job_capacity), 0.35))
@@ -420,6 +511,9 @@ func _run_sim_step() -> void:
 	else:
 		positive_cashflow_streak = 0
 	avg_commute_penalty = 0.0 if penalty_count == 0 else penalty_sum / float(penalty_count)
+	avg_land_value = 0.0 if metric_samples == 0 else land_sum / float(metric_samples)
+	avg_noise = 0.0 if metric_samples == 0 else noise_sum / float(metric_samples)
+	avg_crime = 0.0 if metric_samples == 0 else crime_sum / float(metric_samples)
 	sim_tick += 1
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
@@ -573,6 +667,9 @@ func _init_tiles() -> void:
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	land_value_by_index.clear()
+	noise_by_index.clear()
+	crime_by_index.clear()
 
 	for i in columns * rows:
 		zone_by_index.append(Tool.BULLDOZE)
@@ -580,6 +677,9 @@ func _init_tiles() -> void:
 		building_level_by_index.append(0)
 		district_id_by_index.append("outer_borough_mix")
 		style_profile_by_index.append("default_mixed")
+		land_value_by_index.append(30.0)
+		noise_by_index.append(10.0)
+		crime_by_index.append(10.0)
 
 func _is_in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < columns and cell.y < rows
@@ -606,6 +706,9 @@ func reset_grid() -> void:
 	largest_road_cluster = 0
 	road_efficiency = 1.0
 	avg_commute_penalty = 0.0
+	avg_land_value = 0.0
+	avg_noise = 0.0
+	avg_crime = 0.0
 	service_levels["police"] = 55.0
 	service_levels["fire"] = 55.0
 	service_levels["sanitation"] = 55.0
@@ -793,6 +896,22 @@ func set_service_level(service_id: String, level: float) -> void:
 func get_service_levels() -> Dictionary:
 	return service_levels.duplicate(true)
 
+func set_overlay_mode(mode: String) -> void:
+	if mode in [OVERLAY_NONE, OVERLAY_LAND_VALUE, OVERLAY_NOISE, OVERLAY_CRIME]:
+		overlay_mode = mode
+		queue_redraw()
+
+func get_overlay_mode() -> String:
+	return overlay_mode
+
+func get_overlay_metrics() -> Dictionary:
+	return {
+		"avg_land_value": avg_land_value,
+		"avg_noise": avg_noise,
+		"avg_crime": avg_crime,
+		"avg_commute_penalty": avg_commute_penalty
+	}
+
 func _service_norm(service_id: String) -> float:
 	return clamp(float(service_levels.get(service_id, 0.0)) / 100.0, 0.0, 1.0)
 
@@ -836,9 +955,13 @@ func export_state() -> Dictionary:
 		"building_level_by_index": building_level_by_index.duplicate(),
 		"district_id_by_index": district_id_by_index.duplicate(),
 		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"land_value_by_index": land_value_by_index.duplicate(),
+		"noise_by_index": noise_by_index.duplicate(),
+		"crime_by_index": crime_by_index.duplicate(),
 		"district_policy_map": district_policy_map.duplicate(true)
 		,
 		"service_levels": service_levels.duplicate(true),
+		"overlay_mode": overlay_mode,
 		"sim_speed": sim_speed,
 		"sim_paused": sim_paused,
 		"sim_tick": sim_tick,
@@ -859,6 +982,9 @@ func import_state(state: Dictionary) -> bool:
 	var levels_v: Variant = state.get("building_level_by_index", [])
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
+	var land_v: Variant = state.get("land_value_by_index", [])
+	var noise_v: Variant = state.get("noise_by_index", [])
+	var crime_v: Variant = state.get("crime_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
 	var services_v: Variant = state.get("service_levels", {})
 	var history_v: Variant = state.get("economy_history", [])
@@ -873,6 +999,12 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if typeof(styles_v) != TYPE_ARRAY:
 		return false
+	if typeof(land_v) != TYPE_ARRAY:
+		return false
+	if typeof(noise_v) != TYPE_ARRAY:
+		return false
+	if typeof(crime_v) != TYPE_ARRAY:
+		return false
 	if typeof(policies_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
@@ -886,6 +1018,9 @@ func import_state(state: Dictionary) -> bool:
 	var levels: Array = levels_v
 	var districts: Array = districts_v
 	var styles: Array = styles_v
+	var land_values: Array = land_v
+	var noise_values: Array = noise_v
+	var crime_values: Array = crime_v
 	if zones.size() != expected_size:
 		return false
 	if roads.size() != expected_size:
@@ -896,12 +1031,21 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if styles.size() != expected_size:
 		return false
+	if land_values.size() != expected_size:
+		return false
+	if noise_values.size() != expected_size:
+		return false
+	if crime_values.size() != expected_size:
+		return false
 
 	zone_by_index.clear()
 	road_by_index.clear()
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	land_value_by_index.clear()
+	noise_by_index.clear()
+	crime_by_index.clear()
 
 	for i in range(expected_size):
 		zone_by_index.append(int(zones[i]))
@@ -909,6 +1053,9 @@ func import_state(state: Dictionary) -> bool:
 		building_level_by_index.append(int(levels[i]))
 		district_id_by_index.append(String(districts[i]))
 		style_profile_by_index.append(String(styles[i]))
+		land_value_by_index.append(float(land_values[i]))
+		noise_by_index.append(float(noise_values[i]))
+		crime_by_index.append(float(crime_values[i]))
 
 	district_policy_map = Dictionary(policies_v).duplicate(true)
 	var service_dict: Dictionary = Dictionary(services_v)
@@ -916,6 +1063,9 @@ func import_state(state: Dictionary) -> bool:
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
 	service_levels["sanitation"] = clamp(float(service_dict.get("sanitation", 55.0)), 0.0, 100.0)
 	service_levels["transit"] = clamp(float(service_dict.get("transit", 55.0)), 0.0, 100.0)
+	overlay_mode = String(state.get("overlay_mode", OVERLAY_NONE))
+	if overlay_mode not in [OVERLAY_NONE, OVERLAY_LAND_VALUE, OVERLAY_NOISE, OVERLAY_CRIME]:
+		overlay_mode = OVERLAY_NONE
 	money = int(state.get("money", 8000))
 	population = int(state.get("population", 0))
 	jobs = int(state.get("jobs", 0))
@@ -943,6 +1093,9 @@ func import_state(state: Dictionary) -> bool:
 	largest_road_cluster = 0
 	road_efficiency = 1.0
 	avg_commute_penalty = 0.0
+	avg_land_value = 0.0
+	avg_noise = 0.0
+	avg_crime = 0.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_timer = 0.0
@@ -1032,6 +1185,10 @@ func _update_active_alerts() -> void:
 		_push_alert("warning", "Sanitation Low", "Cleanliness service level is below target.")
 	if float(service_levels.get("transit", 0.0)) < 40.0:
 		_push_alert("warning", "Transit Coverage Low", "Mobility service level is below target.")
+	if avg_noise > 58.0:
+		_push_alert("warning", "High Noise", "City-wide noise levels are elevated.")
+	if avg_crime > 52.0:
+		_push_alert("warning", "High Crime", "Crime pressure is hurting district quality.")
 
 	if housing_pressure > 1.25:
 		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")
@@ -1183,6 +1340,9 @@ func _capture_edit_state() -> Dictionary:
 		"building_level_by_index": building_level_by_index.duplicate(),
 		"district_id_by_index": district_id_by_index.duplicate(),
 		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"land_value_by_index": land_value_by_index.duplicate(),
+		"noise_by_index": noise_by_index.duplicate(),
+		"crime_by_index": crime_by_index.duplicate(),
 		"money": money
 	}
 
@@ -1192,6 +1352,9 @@ func _restore_edit_state(state: Dictionary) -> void:
 	var levels_v: Variant = state.get("building_level_by_index", [])
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
+	var land_v: Variant = state.get("land_value_by_index", [])
+	var noise_v: Variant = state.get("noise_by_index", [])
+	var crime_v: Variant = state.get("crime_by_index", [])
 	if typeof(zones_v) != TYPE_ARRAY:
 		return
 	if typeof(roads_v) != TYPE_ARRAY:
@@ -1202,18 +1365,30 @@ func _restore_edit_state(state: Dictionary) -> void:
 		return
 	if typeof(styles_v) != TYPE_ARRAY:
 		return
+	if typeof(land_v) != TYPE_ARRAY:
+		return
+	if typeof(noise_v) != TYPE_ARRAY:
+		return
+	if typeof(crime_v) != TYPE_ARRAY:
+		return
 
 	zone_by_index.clear()
 	road_by_index.clear()
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	land_value_by_index.clear()
+	noise_by_index.clear()
+	crime_by_index.clear()
 
 	var zones: Array = zones_v
 	var roads: Array = roads_v
 	var levels: Array = levels_v
 	var districts: Array = districts_v
 	var styles: Array = styles_v
+	var land_values: Array = land_v
+	var noise_values: Array = noise_v
+	var crime_values: Array = crime_v
 	if roads.size() != zones.size():
 		return
 	if levels.size() != zones.size():
@@ -1222,6 +1397,12 @@ func _restore_edit_state(state: Dictionary) -> void:
 		return
 	if styles.size() != zones.size():
 		return
+	if land_values.size() != zones.size():
+		return
+	if noise_values.size() != zones.size():
+		return
+	if crime_values.size() != zones.size():
+		return
 
 	for i in range(zones.size()):
 		zone_by_index.append(int(zones[i]))
@@ -1229,5 +1410,8 @@ func _restore_edit_state(state: Dictionary) -> void:
 		building_level_by_index.append(int(levels[i]))
 		district_id_by_index.append(String(districts[i]))
 		style_profile_by_index.append(String(styles[i]))
+		land_value_by_index.append(float(land_values[i]))
+		noise_by_index.append(float(noise_values[i]))
+		crime_by_index.append(float(crime_values[i]))
 
 	money = int(state.get("money", money))

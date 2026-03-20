@@ -29,6 +29,8 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var sanitation_value: Label = $ServicesPanel/VBox/SanitationRow/SanitationValue
 @onready var transit_slider: HSlider = $ServicesPanel/VBox/TransitRow/TransitSlider
 @onready var transit_value: Label = $ServicesPanel/VBox/TransitRow/TransitValue
+@onready var overlay_select: OptionButton = $OverlayPanel/VBox/OverlayRow/OverlaySelect
+@onready var overlay_stats: Label = $OverlayPanel/VBox/OverlayStats
 @onready var econ_money: Label = $EconomyPanel/VBox/EconMoney
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
@@ -140,6 +142,7 @@ func _ready() -> void:
 	fire_slider.value_changed.connect(_on_service_changed.bind("fire"))
 	sanitation_slider.value_changed.connect(_on_service_changed.bind("sanitation"))
 	transit_slider.value_changed.connect(_on_service_changed.bind("transit"))
+	overlay_select.item_selected.connect(_on_overlay_selected)
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -148,6 +151,7 @@ func _ready() -> void:
 	popup_panel.visible = false
 	milestone_banner.visible = false
 	_init_slot_ui()
+	_init_overlay_ui()
 	_refresh_service_controls()
 	_refresh_economy()
 	_refresh_objectives()
@@ -158,6 +162,7 @@ func _process(delta: float) -> void:
 		ui_timer = 0.0
 		_refresh_demand_bars()
 		_refresh_service_controls()
+		_refresh_overlay_controls()
 		_refresh_economy()
 		_refresh_objectives()
 		_refresh_alerts()
@@ -256,6 +261,7 @@ func _refresh_demand_bars() -> void:
 		var demand: float = float(row_data.get("demand_index", 0.0))
 		var policy_id: String = String(row_data.get("policy_id", "balanced"))
 		var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
+		var service_stress: float = float(row_data.get("service_stress", 0.0))
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -274,8 +280,8 @@ func _refresh_demand_bars() -> void:
 
 		var sub: Label = Label.new()
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
-		sub.text = "R %d  C %d  I %d  |  T %.2f  |  %s" % [
-			res_d, com_d, ind_d, traffic_stress, String(POLICY_LABELS.get(policy_id, "Balanced"))
+		sub.text = "R %d  C %d  I %d  |  T %.2f  S %.2f  |  %s" % [
+			res_d, com_d, ind_d, traffic_stress, service_stress, String(POLICY_LABELS.get(policy_id, "Balanced"))
 		]
 		row.add_child(sub)
 
@@ -306,11 +312,12 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 	var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
 	var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
+	var service_stress: float = float(row_data.get("service_stress", 0.0))
 	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name
-	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f" % [
-		demand, res_d, com_d, ind_d, traffic_stress
+	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f\nService Stress %.2f" % [
+		demand, res_d, com_d, ind_d, traffic_stress, service_stress
 	]
 	popup_policy.text = "Policy: %s" % String(POLICY_LABELS.get(policy_id, "Balanced"))
 	popup_panel.visible = true
@@ -446,6 +453,58 @@ func _update_service_labels() -> void:
 	fire_value.text = str(int(round(fire_slider.value)))
 	sanitation_value.text = str(int(round(sanitation_slider.value)))
 	transit_value.text = str(int(round(transit_slider.value)))
+
+func _init_overlay_ui() -> void:
+	overlay_select.clear()
+	overlay_select.add_item("Overlay: None", 0)
+	overlay_select.add_item("Overlay: Land Value", 1)
+	overlay_select.add_item("Overlay: Noise", 2)
+	overlay_select.add_item("Overlay: Crime", 3)
+	overlay_select.select(0)
+	overlay_stats.text = "Land 0.0  Noise 0.0  Crime 0.0  Commute 0.0"
+
+func _on_overlay_selected(index: int) -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_overlay_mode"):
+		return
+	var mode := "none"
+	if index == 1:
+		mode = "land_value"
+	elif index == 2:
+		mode = "noise"
+	elif index == 3:
+		mode = "crime"
+	city_grid.call("set_overlay_mode", mode)
+
+func _refresh_overlay_controls() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_overlay_mode"):
+		return
+	if not city_grid.has_method("get_overlay_metrics"):
+		return
+
+	var mode: String = String(city_grid.call("get_overlay_mode"))
+	var target_idx := 0
+	if mode == "land_value":
+		target_idx = 1
+	elif mode == "noise":
+		target_idx = 2
+	elif mode == "crime":
+		target_idx = 3
+	if overlay_select.selected != target_idx:
+		overlay_select.select(target_idx)
+
+	var metrics_v: Variant = city_grid.call("get_overlay_metrics")
+	if typeof(metrics_v) != TYPE_DICTIONARY:
+		return
+	var metrics: Dictionary = metrics_v
+	var land: float = float(metrics.get("avg_land_value", 0.0))
+	var noise: float = float(metrics.get("avg_noise", 0.0))
+	var crime: float = float(metrics.get("avg_crime", 0.0))
+	var commute: float = float(metrics.get("avg_commute_penalty", 0.0))
+	overlay_stats.text = "Land %.1f  Noise %.1f  Crime %.1f  Commute %.2f" % [land, noise, crime, commute]
 
 func _refresh_objectives() -> void:
 	if city_grid == null:
