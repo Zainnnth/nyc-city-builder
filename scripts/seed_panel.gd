@@ -45,6 +45,12 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var milestone_banner: PanelContainer = $MilestoneBanner
 @onready var milestone_banner_text: Label = $MilestoneBanner/VBox/BannerText
 @onready var milestone_banner_sub: Label = $MilestoneBanner/VBox/BannerSub
+@onready var tutorial_panel: PanelContainer = $TutorialPanel
+@onready var tutorial_title: Label = $TutorialPanel/VBox/TutorialTitle
+@onready var tutorial_body: Label = $TutorialPanel/VBox/TutorialBody
+@onready var tutorial_progress: Label = $TutorialPanel/VBox/TutorialProgress
+@onready var tutorial_next_button: Button = $TutorialPanel/VBox/TutorialButtons/TutorialNextButton
+@onready var tutorial_skip_button: Button = $TutorialPanel/VBox/TutorialButtons/TutorialSkipButton
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
 @onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
@@ -66,6 +72,31 @@ const AUTOSAVE_INTERVAL := 20.0
 var banner_acknowledged := false
 var is_syncing_services := false
 var is_syncing_balance := false
+var tutorial_step_index := 0
+var tutorial_active := false
+const TUTORIAL_STATE_PATH := "user://tutorial_state.json"
+const TUTORIAL_STEPS := [
+	{
+		"title": "Welcome to Neon Boroughs",
+		"body": "Paint roads and zones with number keys 1-5, then drag with left mouse to build quickly."
+	},
+	{
+		"title": "Seed and Scenario",
+		"body": "Use seed + presets to generate district layouts, then pick a balance profile to tune growth pressure."
+	},
+	{
+		"title": "Services and Overlays",
+		"body": "Adjust police/fire/sanitation/transit, then inspect Land/Noise/Crime overlays to spot weak neighborhoods."
+	},
+	{
+		"title": "District Management",
+		"body": "Focus districts from demand rows, set policies in the popup, and react to events before they compound."
+	},
+	{
+		"title": "Progress and Persistence",
+		"body": "Track objectives + alerts, use save slots/autosave, and keep a positive treasury for long-term expansion."
+	}
+]
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -155,12 +186,17 @@ func _ready() -> void:
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
 	policy_growth_button.pressed.connect(_on_set_policy.bind("growth"))
 	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
+	tutorial_next_button.pressed.connect(_on_tutorial_next)
+	tutorial_skip_button.pressed.connect(_on_tutorial_skip)
 	popup_panel.visible = false
 	milestone_banner.visible = false
+	tutorial_panel.visible = false
 	_apply_retro_ui_theme()
+	_apply_tooltips()
 	_init_slot_ui()
 	_init_balance_profiles()
 	_init_overlay_ui()
+	_init_tutorial()
 	_refresh_service_controls()
 	_refresh_economy()
 	_refresh_event_panel()
@@ -423,6 +459,88 @@ func _init_slot_ui() -> void:
 	autosave_next_slot = 1
 	_update_slot_labels()
 	_update_time_buttons()
+
+func _init_tutorial() -> void:
+	var seen: bool = _load_tutorial_seen()
+	if seen:
+		tutorial_active = false
+		tutorial_panel.visible = false
+		return
+	tutorial_active = true
+	tutorial_step_index = 0
+	_refresh_tutorial_panel()
+
+func _refresh_tutorial_panel() -> void:
+	if not tutorial_active:
+		tutorial_panel.visible = false
+		return
+	if tutorial_step_index < 0 or tutorial_step_index >= TUTORIAL_STEPS.size():
+		tutorial_active = false
+		tutorial_panel.visible = false
+		_save_tutorial_seen(true)
+		return
+	tutorial_panel.visible = true
+	var step: Dictionary = TUTORIAL_STEPS[tutorial_step_index]
+	tutorial_title.text = String(step.get("title", "Onboarding"))
+	tutorial_body.text = String(step.get("body", ""))
+	tutorial_progress.text = "Step %d/%d" % [tutorial_step_index + 1, TUTORIAL_STEPS.size()]
+	tutorial_next_button.text = "Finish" if tutorial_step_index == TUTORIAL_STEPS.size() - 1 else "Next"
+
+func _on_tutorial_next() -> void:
+	if not tutorial_active:
+		return
+	tutorial_step_index += 1
+	if tutorial_step_index >= TUTORIAL_STEPS.size():
+		tutorial_active = false
+		tutorial_panel.visible = false
+		_save_tutorial_seen(true)
+		status_label.text = "Tutorial complete."
+		return
+	_refresh_tutorial_panel()
+
+func _on_tutorial_skip() -> void:
+	tutorial_active = false
+	tutorial_panel.visible = false
+	_save_tutorial_seen(true)
+	status_label.text = "Tutorial skipped."
+
+func _load_tutorial_seen() -> bool:
+	if not FileAccess.file_exists(TUTORIAL_STATE_PATH):
+		return false
+	var fp := FileAccess.open(TUTORIAL_STATE_PATH, FileAccess.READ)
+	if fp == null:
+		return false
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	var payload: Dictionary = parsed
+	return bool(payload.get("tutorial_seen", false))
+
+func _save_tutorial_seen(seen: bool) -> void:
+	var payload := {"tutorial_seen": seen}
+	var fp := FileAccess.open(TUTORIAL_STATE_PATH, FileAccess.WRITE)
+	if fp == null:
+		return
+	fp.store_string(JSON.stringify(payload))
+
+func _apply_tooltips() -> void:
+	input_seed.tooltip_text = "Deterministic city seed. Use same seed for same base layout."
+	apply_button.tooltip_text = "Regenerate districts with the current seed."
+	random_button.tooltip_text = "Roll a random seed and regenerate."
+	save_button.tooltip_text = "Save current city state to selected slot."
+	load_button.tooltip_text = "Load selected save slot."
+	load_latest_button.tooltip_text = "Load most recently modified save slot."
+	autosave_toggle.tooltip_text = "Enable rolling autosaves every ~20 seconds."
+	balance_profile_select.tooltip_text = "Scenario tuning profile affecting growth/tax/upkeep/event pressure."
+	pause_button.tooltip_text = "Pause or resume simulation."
+	speed_1x_button.tooltip_text = "Set simulation speed to real-time."
+	speed_3x_button.tooltip_text = "Set simulation speed to 3x."
+	police_slider.tooltip_text = "Higher police lowers crime stress."
+	fire_slider.tooltip_text = "Higher fire lowers disaster risk impact."
+	sanitation_slider.tooltip_text = "Higher sanitation improves land value and reduces noise pressure."
+	transit_slider.tooltip_text = "Higher transit improves growth and commute outcomes."
+	overlay_select.tooltip_text = "Select an overlay to visualize hidden simulation pressures."
+	trigger_event_button.tooltip_text = "Force a random district event for stress testing."
 
 func _on_slot_changed(_idx: int) -> void:
 	autosave_next_slot = _current_slot()
@@ -836,7 +954,8 @@ func _apply_retro_ui_theme() -> void:
 		"EventPanel",
 		"ObjectivesPanel",
 		"DistrictPopup",
-		"MilestoneBanner"
+		"MilestoneBanner",
+		"TutorialPanel"
 	]
 	for panel_path in panel_paths:
 		var node: Node = get_node_or_null(panel_path)
@@ -891,7 +1010,9 @@ func _all_buttons() -> Array[Button]:
 		policy_growth_button,
 		policy_profit_button,
 		close_popup_button,
-		trigger_event_button
+		trigger_event_button,
+		tutorial_next_button,
+		tutorial_skip_button
 	]
 
 func _apply_label_palette(root: Node) -> void:

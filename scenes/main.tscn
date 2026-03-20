@@ -403,3 +403,37 @@ text = "City Milestone Complete"
 [node name="BannerSub" type="Label" parent="SeedPanel/MilestoneBanner/VBox"]
 layout_mode = 2
 text = "All objectives achieved."
+
+[node name="TutorialPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 676.0
+offset_top = 378.0
+offset_right = 980.0
+offset_bottom = 522.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/TutorialPanel"]
+layout_mode = 2
+
+[node name="TutorialTitle" type="Label" parent="SeedPanel/TutorialPanel/VBox"]
+layout_mode = 2
+text = "Onboarding"
+
+[node name="TutorialBody" type="Label" parent="SeedPanel/TutorialPanel/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Welcome to Neon Boroughs."
+
+[node name="TutorialProgress" type="Label" parent="SeedPanel/TutorialPanel/VBox"]
+layout_mode = 2
+text = "Step 1/1"
+
+[node name="TutorialButtons" type="HBoxContainer" parent="SeedPanel/TutorialPanel/VBox"]
+layout_mode = 2
+
+[node name="TutorialNextButton" type="Button" parent="SeedPanel/TutorialPanel/VBox/TutorialButtons"]
+layout_mode = 2
+text = "Next"
+
+[node name="TutorialSkipButton" type="Button" parent="SeedPanel/TutorialPanel/VBox/TutorialButtons"]
+layout_mode = 2
+text = "Skip"
