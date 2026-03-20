@@ -9,6 +9,11 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   archival urban tones with neon accents.
 - Style target: vaporwave-adjacent, but grittier and less pastel.
 
+## Roadmap
+
+- Project roadmap and build checklist:
+  - `docs/ROADMAP.md`
+
 ## Current Prototype
 
 - Paintable grid with tools:
