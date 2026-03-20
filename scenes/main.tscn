@@ -60,6 +60,17 @@ text = "Apply Seed"
 layout_mode = 2
 text = "Randomize"
 
+[node name="Persistence" type="HBoxContainer" parent="SeedPanel/Panel/VBox"]
+layout_mode = 2
+
+[node name="SaveButton" type="Button" parent="SeedPanel/Panel/VBox/Persistence"]
+layout_mode = 2
+text = "Save City"
+
+[node name="LoadButton" type="Button" parent="SeedPanel/Panel/VBox/Persistence"]
+layout_mode = 2
+text = "Load City"
+
 [node name="StatusLabel" type="Label" parent="SeedPanel/Panel/VBox"]
 layout_mode = 2
 text = "Ready."

@@ -533,3 +533,89 @@ func _policy_tax_multiplier(policy_id: String) -> float:
 
 func _policy_upkeep_multiplier(policy_id: String) -> float:
 	return float(POLICY_UPKEEP_MULT.get(policy_id, 1.0))
+
+func export_state() -> Dictionary:
+	return {
+		"columns": columns,
+		"rows": rows,
+		"cell_size": cell_size,
+		"money": money,
+		"population": population,
+		"jobs": jobs,
+		"selected_tool": int(selected_tool),
+		"zone_by_index": zone_by_index.duplicate(),
+		"road_by_index": road_by_index.duplicate(),
+		"building_level_by_index": building_level_by_index.duplicate(),
+		"district_id_by_index": district_id_by_index.duplicate(),
+		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"district_policy_map": district_policy_map.duplicate(true)
+	}
+
+func import_state(state: Dictionary) -> bool:
+	if int(state.get("columns", -1)) != columns:
+		return false
+	if int(state.get("rows", -1)) != rows:
+		return false
+
+	var zones_v: Variant = state.get("zone_by_index", [])
+	var roads_v: Variant = state.get("road_by_index", [])
+	var levels_v: Variant = state.get("building_level_by_index", [])
+	var districts_v: Variant = state.get("district_id_by_index", [])
+	var styles_v: Variant = state.get("style_profile_by_index", [])
+	var policies_v: Variant = state.get("district_policy_map", {})
+
+	if typeof(zones_v) != TYPE_ARRAY:
+		return false
+	if typeof(roads_v) != TYPE_ARRAY:
+		return false
+	if typeof(levels_v) != TYPE_ARRAY:
+		return false
+	if typeof(districts_v) != TYPE_ARRAY:
+		return false
+	if typeof(styles_v) != TYPE_ARRAY:
+		return false
+	if typeof(policies_v) != TYPE_DICTIONARY:
+		return false
+
+	var expected_size := columns * rows
+	var zones: Array = zones_v
+	var roads: Array = roads_v
+	var levels: Array = levels_v
+	var districts: Array = districts_v
+	var styles: Array = styles_v
+	if zones.size() != expected_size:
+		return false
+	if roads.size() != expected_size:
+		return false
+	if levels.size() != expected_size:
+		return false
+	if districts.size() != expected_size:
+		return false
+	if styles.size() != expected_size:
+		return false
+
+	zone_by_index.clear()
+	road_by_index.clear()
+	building_level_by_index.clear()
+	district_id_by_index.clear()
+	style_profile_by_index.clear()
+
+	for i in range(expected_size):
+		zone_by_index.append(int(zones[i]))
+		road_by_index.append(bool(roads[i]))
+		building_level_by_index.append(int(levels[i]))
+		district_id_by_index.append(String(districts[i]))
+		style_profile_by_index.append(String(styles[i]))
+
+	district_policy_map = Dictionary(policies_v).duplicate(true)
+	money = int(state.get("money", 8000))
+	population = int(state.get("population", 0))
+	jobs = int(state.get("jobs", 0))
+	selected_tool = int(state.get("selected_tool", int(Tool.ROAD)))
+	connected_residential = 0
+	connected_commercial = 0
+	connected_industrial = 0
+	district_demand_snapshot.clear()
+	sim_timer = 0.0
+	queue_redraw()
+	return true

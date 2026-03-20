@@ -8,6 +8,8 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var input_seed: LineEdit = $Panel/VBox/SeedRow/SeedInput
 @onready var apply_button: Button = $Panel/VBox/Controls/ApplySeedButton
 @onready var random_button: Button = $Panel/VBox/Controls/RandomSeedButton
+@onready var save_button: Button = $Panel/VBox/Persistence/SaveButton
+@onready var load_button: Button = $Panel/VBox/Persistence/LoadButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var popup_panel: PanelContainer = $DistrictPopup
@@ -55,6 +57,8 @@ func _ready() -> void:
 	status_label.text = "Ready."
 	apply_button.pressed.connect(_on_apply_seed)
 	random_button.pressed.connect(_on_random_seed)
+	save_button.pressed.connect(_on_save_city)
+	load_button.pressed.connect(_on_load_city)
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -90,6 +94,25 @@ func _on_random_seed() -> void:
 	input_seed.text = str(seed_value)
 	district_generator.call("regenerate", seed_value, false)
 	status_label.text = "Random seed %d applied." % seed_value
+
+func _on_save_city() -> void:
+	if district_generator == null:
+		return
+	var ok: bool = district_generator.call("save_to_file")
+	if ok:
+		status_label.text = "City saved."
+	else:
+		status_label.text = "Save failed."
+
+func _on_load_city() -> void:
+	if district_generator == null:
+		return
+	var ok: bool = district_generator.call("load_from_file")
+	if ok:
+		input_seed.text = str(district_generator.call("get_world_seed"))
+		status_label.text = "City loaded."
+	else:
+		status_label.text = "Load failed (no save yet?)."
 
 func _refresh_demand_bars() -> void:
 	if city_grid == null:

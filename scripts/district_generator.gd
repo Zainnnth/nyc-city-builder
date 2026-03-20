@@ -13,6 +13,7 @@ var overlay_blocks: Array[Dictionary] = []
 var style_profiles: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var district_focus_points: Dictionary = {}
+const DEFAULT_SAVE_PATH := "user://savegame.json"
 
 const DISTRICT_COLORS := {
 	"midtown_core": Color(0.94, 0.62, 0.20, 0.38),
@@ -22,6 +23,7 @@ const DISTRICT_COLORS := {
 	"queens_west": Color(0.62, 0.50, 0.90, 0.36),
 	"outer_borough_mix": Color(0.60, 0.62, 0.71, 0.32)
 }
+const BULLDOZE_ZONE := 4
 
 func _ready() -> void:
 	city_grid = get_node_or_null(city_grid_path)
@@ -148,8 +150,14 @@ func _lookup_district(lon: float, lat: float, districts_cfg: Dictionary, fallbac
 
 func _map_records_to_grid(records: Array[Dictionary]) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	var columns: int = city_grid.get("columns")
-	var rows: int = city_grid.get("rows")
+	var columns_v: Variant = city_grid.get("columns")
+	var rows_v: Variant = city_grid.get("rows")
+	if typeof(columns_v) != TYPE_INT:
+		return result
+	if typeof(rows_v) != TYPE_INT:
+		return result
+	var columns: int = columns_v
+	var rows: int = rows_v
 	if columns <= 0 or rows <= 0:
 		return result
 
@@ -309,3 +317,91 @@ func regenerate(new_seed: int = -1, initial_load: bool = false) -> void:
 		city_grid.call("apply_district_seed", seeded)
 	_build_overlay(seeded)
 	queue_redraw()
+
+func save_to_file(path: String = DEFAULT_SAVE_PATH) -> bool:
+	if city_grid == null:
+		return false
+	if not city_grid.has_method("export_state"):
+		return false
+
+	var city_state: Dictionary = city_grid.call("export_state")
+	var payload := {
+		"version": 1,
+		"world_seed": int(world_seed),
+		"city_state": city_state
+	}
+
+	var fp := FileAccess.open(path, FileAccess.WRITE)
+	if fp == null:
+		return false
+	fp.store_string(JSON.stringify(payload, "  "))
+	return true
+
+func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
+	if city_grid == null:
+		return false
+	if not city_grid.has_method("import_state"):
+		return false
+	if not FileAccess.file_exists(path):
+		return false
+
+	var fp := FileAccess.open(path, FileAccess.READ)
+	if fp == null:
+		return false
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	var payload: Dictionary = parsed
+	var city_state_v: Variant = payload.get("city_state", {})
+	if typeof(city_state_v) != TYPE_DICTIONARY:
+		return false
+
+	world_seed = int(payload.get("world_seed", world_seed))
+	rng.seed = int(world_seed)
+	var ok: bool = city_grid.call("import_state", city_state_v)
+	if not ok:
+		return false
+	_rebuild_overlay_from_city_grid()
+	queue_redraw()
+	return true
+
+func _rebuild_overlay_from_city_grid() -> void:
+	overlay_blocks.clear()
+	district_focus_points.clear()
+	if city_grid == null:
+		return
+
+	var columns: int = city_grid.get("columns")
+	var rows: int = city_grid.get("rows")
+	var cell_size: float = city_grid.get("cell_size")
+	var zones: Array = city_grid.get("zone_by_index")
+	var districts: Array = city_grid.get("district_id_by_index")
+	var accum := {}
+
+	for y in range(rows):
+		for x in range(columns):
+			var i := y * columns + x
+			var zone := int(zones[i])
+			if zone == BULLDOZE_ZONE:
+				continue
+			var district_id: String = String(districts[i])
+			var color: Color = DISTRICT_COLORS.get(district_id, DISTRICT_COLORS["outer_borough_mix"])
+			var rect := Rect2(Vector2(x, y) * cell_size, Vector2.ONE * cell_size)
+			overlay_blocks.append({"rect": rect, "color": color})
+
+			var center_local := Vector2(x + 0.5, y + 0.5) * cell_size
+			if not accum.has(district_id):
+				accum[district_id] = {"sum": Vector2.ZERO, "count": 0}
+			var bucket: Dictionary = accum[district_id]
+			bucket["sum"] = Vector2(bucket["sum"]) + center_local
+			bucket["count"] = int(bucket["count"]) + 1
+			accum[district_id] = bucket
+
+	for district_key in accum.keys():
+		var district_id: String = String(district_key)
+		var bucket: Dictionary = accum[district_id]
+		var count: int = int(bucket.get("count", 0))
+		if count <= 0:
+			continue
+		var avg_local: Vector2 = Vector2(bucket["sum"]) / float(count)
+		district_focus_points[district_id] = avg_local + position

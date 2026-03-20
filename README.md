@@ -27,6 +27,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - In-game seed panel:
   - Enter a seed and click `Apply Seed` to regenerate neighborhoods.
   - Click `Randomize` for a new deterministic layout.
+  - `Save City` / `Load City` persist full simulation state (`user://savegame.json`).
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
   - Updates continuously from simulation telemetry.
