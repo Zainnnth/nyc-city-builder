@@ -38,7 +38,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] District identity content packs (Midtown, LES, Harlem, FiDi, Queens West)
 - [x] Style-linked building archetypes and signage density
 - [x] Atmosphere pass: haze, sodium lights, retro UI accents
-- [ ] Audio bed by district mood/state
+- [x] Audio bed by district mood/state
 
 ## Phase 4 - Productionization
 

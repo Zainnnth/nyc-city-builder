@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://dxv43pylos7s4"]
+[gd_scene load_steps=6 format=3 uid="uid://dxv43pylos7s4"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_m2tlq"]
 [ext_resource type="Script" path="res://scripts/city_grid.gd" id="2_2s0fj"]
 [ext_resource type="Script" path="res://scripts/district_generator.gd" id="3_lk2hu"]
 [ext_resource type="Script" path="res://scripts/seed_panel.gd" id="4_nd1mf"]
+[ext_resource type="Script" path="res://scripts/audio_bed.gd" id="5_t5x4a"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_m2tlq")
@@ -23,6 +24,9 @@ script = ExtResource("3_lk2hu")
 
 [node name="SeedPanel" type="CanvasLayer" parent="."]
 script = ExtResource("4_nd1mf")
+
+[node name="AudioBed" type="Node" parent="."]
+script = ExtResource("5_t5x4a")
 
 [node name="Panel" type="PanelContainer" parent="SeedPanel"]
 offset_left = 14.0

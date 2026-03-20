@@ -64,6 +64,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Animated haze and sodium-light pools across the map
     - Retro scanline treatment and pulsing HUD accent colors
     - CRT-inspired panel/button skin for the management UI
+  - Dynamic audio bed (v1):
+    - Procedural ambient drone + pulse generated at runtime (no external assets)
+    - Reacts to dominant district demand profile and city stress pressure
+    - Responds to active events (`Blackout`, `Transit Strike`, `Heatwave`)
   - Economy snapshot panel with per-tick deltas and pressure indicators.
   - City alerts panel for budget, pressure, and connectivity warnings.
   - Objectives panel for milestone progression.
