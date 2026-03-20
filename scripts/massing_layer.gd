@@ -5,6 +5,7 @@ extends Node2D
 @export var massing_profile_path := "res://data/runtime/massing_profiles.json"
 @export var landmark_pack_path := "res://data/runtime/landmark_pack.json"
 @export var landmark_assets_path := "res://data/runtime/landmark_assets.json"
+@export var prefab_sets_path := "res://data/runtime/prefab_sets.json"
 @export var enabled := true
 
 var district_generator: Node2D
@@ -12,6 +13,7 @@ var city_grid: Node2D
 var massing_profiles: Dictionary = {}
 var landmark_pack: Dictionary = {}
 var landmark_assets: Dictionary = {}
+var prefab_sets: Dictionary = {}
 var massing_instances: Array[Dictionary] = []
 
 const DISTRICT_TINTS := {
@@ -39,6 +41,7 @@ func _ready() -> void:
 	massing_profiles = _load_massing_profiles()
 	landmark_pack = _load_landmark_pack()
 	landmark_assets = _load_landmark_assets()
+	prefab_sets = _load_prefab_sets()
 	if district_generator != null and district_generator.has_signal("seed_records_generated"):
 		district_generator.connect("seed_records_generated", _on_seed_records_generated)
 	if district_generator != null and district_generator.has_method("get_seed_records_snapshot"):
@@ -89,6 +92,9 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		var district_id: String = String(seed_record.get("district_id", "outer_borough_mix"))
 		var archetype: String = String(seed_record.get("archetype", ""))
 		var profile: Dictionary = _profile_for(style_profile)
+		var prefab: Dictionary = _select_prefab_config(seed_record, world_seed)
+		if not prefab.is_empty():
+			profile = _apply_prefab_profile_overrides(profile, prefab)
 		var landmark_v: Variant = landmark_assignments.get(_cell_key(cell), null)
 		var landmark: Dictionary = landmark_v if typeof(landmark_v) == TYPE_DICTIONARY else {}
 		if not landmark.is_empty():
@@ -101,7 +107,8 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		var jitter: float = (_hash01(cell, world_seed, 17) - 0.5) * 2.0 * height_jitter
 		var landmark_height_mult: float = clamp(float(landmark.get("height_mult", 1.0)), 0.75, 3.5)
 		var asset_height_mult: float = clamp(float(asset.get("height_mult", 1.0)), 0.75, 3.5)
-		var height_px: float = max(8.0, float(level) * height_per_level * landmark_height_mult * asset_height_mult + jitter)
+		var prefab_height_mult: float = clamp(float(prefab.get("height_mult", 1.0)), 0.65, 3.5)
+		var height_px: float = max(8.0, float(level) * height_per_level * landmark_height_mult * asset_height_mult * prefab_height_mult + jitter)
 		var skew_x: float = clamp(float(profile.get("iso_skew_x", 0.42)), 0.2, 0.8)
 		var skew_y: float = clamp(float(profile.get("iso_skew_y", 1.0)), 0.65, 1.35)
 		var lift := Vector2(-height_px * skew_x, -height_px * skew_y)
@@ -119,6 +126,8 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		var district_base: Color = DISTRICT_TINTS.get(district_id, DISTRICT_TINTS["outer_borough_mix"])
 		var wall_tint: Color = Color.from_string(String(profile.get("wall_tint", "#8aa0bf")), district_base)
 		var roof_tint: Color = Color.from_string(String(profile.get("roof_tint", "#d8b691")), district_base.lightened(0.18))
+		wall_tint = Color.from_string(String(prefab.get("wall_tint", "")), wall_tint)
+		roof_tint = Color.from_string(String(prefab.get("roof_tint", "")), roof_tint)
 		if not landmark.is_empty():
 			wall_tint = Color.from_string(String(landmark.get("wall_tint", "")), wall_tint)
 			roof_tint = Color.from_string(String(landmark.get("roof_tint", "")), roof_tint)
@@ -129,6 +138,8 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		if not landmark.is_empty():
 			top_color = top_color.lightened(0.05)
 		var outline_color := Color(0.08, 0.1, 0.14, 0.72)
+		if not prefab.is_empty():
+			outline_color = Color.from_string(String(prefab.get("outline_tint", "")), outline_color)
 		if not landmark.is_empty():
 			outline_color = Color(0.92, 0.69, 0.33, 0.85)
 
@@ -147,6 +158,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 				"outline_color": outline_color,
 				"landmark_name": String(landmark.get("name", "")),
 				"landmark_asset_id": String(landmark.get("asset_id", "")),
+				"prefab_id": String(prefab.get("id", "")),
 				"archetype": archetype,
 				"height_px": height_px,
 				"roof_center": (t0 + t1 + t2 + t3) / 4.0
@@ -199,6 +211,17 @@ func _load_landmark_assets() -> Dictionary:
 		return {}
 	return Dictionary(assets_v).duplicate(true)
 
+func _load_prefab_sets() -> Dictionary:
+	if not FileAccess.file_exists(prefab_sets_path):
+		return {}
+	var fp := FileAccess.open(prefab_sets_path, FileAccess.READ)
+	if fp == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return Dictionary(parsed).duplicate(true)
+
 func _profile_for(style_profile: String) -> Dictionary:
 	if massing_profiles.has(style_profile):
 		return _merged_profile(Dictionary(massing_profiles[style_profile]))
@@ -215,6 +238,16 @@ func _merged_profile(profile: Dictionary) -> Dictionary:
 func _apply_landmark_profile_overrides(profile: Dictionary, landmark: Dictionary) -> Dictionary:
 	var merged: Dictionary = profile.duplicate(true)
 	var overrides_v: Variant = landmark.get("profile_overrides", {})
+	if typeof(overrides_v) != TYPE_DICTIONARY:
+		return merged
+	var overrides: Dictionary = overrides_v
+	for key in overrides.keys():
+		merged[key] = overrides[key]
+	return merged
+
+func _apply_prefab_profile_overrides(profile: Dictionary, prefab: Dictionary) -> Dictionary:
+	var merged: Dictionary = profile.duplicate(true)
+	var overrides_v: Variant = prefab.get("profile_overrides", {})
 	if typeof(overrides_v) != TYPE_DICTIONARY:
 		return merged
 	var overrides: Dictionary = overrides_v
@@ -320,6 +353,89 @@ func _matching_landmarks(seed_record: Dictionary, landmarks: Array) -> Array[Dic
 					continue
 		output.append(landmark)
 	return output
+
+func _select_prefab_config(seed_record: Dictionary, world_seed: int) -> Dictionary:
+	if prefab_sets.is_empty():
+		return {}
+	var district_id: String = String(seed_record.get("district_id", "outer_borough_mix"))
+	var district_sets_v: Variant = prefab_sets.get("district_sets", {})
+	var district_sets: Dictionary = district_sets_v if typeof(district_sets_v) == TYPE_DICTIONARY else {}
+	var set_data_v: Variant = district_sets.get(district_id, {})
+	var set_data: Dictionary = set_data_v if typeof(set_data_v) == TYPE_DICTIONARY else {}
+
+	var entries: Array = []
+	var entries_v: Variant = set_data.get("entries", [])
+	if typeof(entries_v) == TYPE_ARRAY:
+		entries = entries_v
+	if entries.is_empty():
+		var fallback_v: Variant = prefab_sets.get("fallback_set", {})
+		if typeof(fallback_v) == TYPE_DICTIONARY:
+			var fallback: Dictionary = fallback_v
+			var fallback_entries_v: Variant = fallback.get("entries", [])
+			if typeof(fallback_entries_v) == TYPE_ARRAY:
+				entries = fallback_entries_v
+	if entries.is_empty():
+		return {}
+
+	var candidates: Array[Dictionary] = []
+	var total_weight := 0.0
+	for entry_v in entries:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_v
+		if not _prefab_entry_matches(seed_record, entry):
+			continue
+		var weight: float = max(0.0, float(entry.get("weight", 0.0)))
+		if weight <= 0.0:
+			continue
+		total_weight += weight
+		candidates.append(entry)
+	if candidates.is_empty() or total_weight <= 0.0:
+		return {}
+
+	var cell: Vector2i = seed_record.get("cell", Vector2i.ZERO)
+	var roll_weight: float = _hash01(cell, world_seed, 401) * total_weight
+	var accum := 0.0
+	for candidate in candidates:
+		accum += max(0.0, float(candidate.get("weight", 0.0)))
+		if roll_weight <= accum:
+			return candidate.duplicate(true)
+	return candidates[candidates.size() - 1].duplicate(true)
+
+func _prefab_entry_matches(seed_record: Dictionary, entry: Dictionary) -> bool:
+	var level: int = int(seed_record.get("seed_level", 1))
+	var style_profile: String = String(seed_record.get("style_profile", "")).to_lower()
+	var archetype: String = String(seed_record.get("archetype", "")).to_lower()
+	var min_level: int = int(entry.get("min_level", 1))
+	if level < min_level:
+		return false
+
+	var style_contains_v: Variant = entry.get("style_contains", [])
+	if typeof(style_contains_v) == TYPE_ARRAY:
+		var style_patterns: Array = style_contains_v
+		if not style_patterns.is_empty():
+			var style_ok := false
+			for pattern_v in style_patterns:
+				var pattern: String = String(pattern_v).to_lower()
+				if pattern != "" and style_profile.find(pattern) != -1:
+					style_ok = true
+					break
+			if not style_ok:
+				return false
+
+	var archetype_contains_v: Variant = entry.get("archetype_contains", [])
+	if typeof(archetype_contains_v) == TYPE_ARRAY:
+		var archetype_patterns: Array = archetype_contains_v
+		if not archetype_patterns.is_empty():
+			var archetype_ok := false
+			for pattern_v in archetype_patterns:
+				var pattern: String = String(pattern_v).to_lower()
+				if pattern != "" and archetype.find(pattern) != -1:
+					archetype_ok = true
+					break
+			if not archetype_ok:
+				return false
+	return true
 
 func _cell_key(cell: Vector2i) -> String:
 	return "%d:%d" % [cell.x, cell.y]

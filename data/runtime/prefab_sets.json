@@ -1,0 +1,163 @@
+{
+  "district_sets": {
+    "midtown_core": {
+      "entries": [
+        {
+          "id": "midtown_glass_tower",
+          "weight": 5,
+          "min_level": 2,
+          "archetype_contains": ["glass", "tower"],
+          "height_mult": 1.15,
+          "wall_tint": "#9bb4d5",
+          "roof_tint": "#f0c894",
+          "outline_tint": "#3a475a",
+          "profile_overrides": {
+            "inset_px": 9.0,
+            "iso_skew_x": 0.39
+          }
+        },
+        {
+          "id": "midtown_stone_tower",
+          "weight": 3,
+          "min_level": 2,
+          "archetype_contains": ["stone", "tower"],
+          "height_mult": 1.08,
+          "wall_tint": "#93a6bf",
+          "roof_tint": "#d7b085",
+          "outline_tint": "#334154",
+          "profile_overrides": {
+            "inset_px": 10.0
+          }
+        },
+        {
+          "id": "midtown_neon_podium",
+          "weight": 2,
+          "min_level": 1,
+          "archetype_contains": ["marquee"],
+          "height_mult": 0.95,
+          "wall_tint": "#8ea2bc",
+          "roof_tint": "#e8b186",
+          "outline_tint": "#42556c"
+        }
+      ]
+    },
+    "financial_district": {
+      "entries": [
+        {
+          "id": "fidi_steel_crown",
+          "weight": 4,
+          "min_level": 2,
+          "archetype_contains": ["tower"],
+          "height_mult": 1.12,
+          "wall_tint": "#96abc5",
+          "roof_tint": "#e5bc94",
+          "outline_tint": "#35465a"
+        },
+        {
+          "id": "fidi_stone_block",
+          "weight": 3,
+          "min_level": 1,
+          "archetype_contains": ["stone"],
+          "height_mult": 1.0,
+          "wall_tint": "#899aae",
+          "roof_tint": "#cea67f",
+          "outline_tint": "#334357"
+        }
+      ]
+    },
+    "lower_east_side": {
+      "entries": [
+        {
+          "id": "les_neon_walkup",
+          "weight": 4,
+          "min_level": 1,
+          "archetype_contains": ["marquee", "bodega"],
+          "height_mult": 0.96,
+          "wall_tint": "#8ca0b8",
+          "roof_tint": "#e7a981",
+          "outline_tint": "#3f5369"
+        },
+        {
+          "id": "les_rooftop_warehouse",
+          "weight": 2,
+          "min_level": 1,
+          "archetype_contains": ["warehouse"],
+          "height_mult": 1.02,
+          "wall_tint": "#879bb2",
+          "roof_tint": "#c89874",
+          "outline_tint": "#3b4d62"
+        }
+      ]
+    },
+    "harlem": {
+      "entries": [
+        {
+          "id": "harlem_brownstone_row",
+          "weight": 5,
+          "min_level": 1,
+          "archetype_contains": ["brownstone", "cultural"],
+          "height_mult": 0.94,
+          "wall_tint": "#8d96a7",
+          "roof_tint": "#d5a27f",
+          "outline_tint": "#3e4f64"
+        },
+        {
+          "id": "harlem_mixed_midrise",
+          "weight": 2,
+          "min_level": 1,
+          "style_contains": ["midrise"],
+          "height_mult": 1.0,
+          "wall_tint": "#8fa3bb",
+          "roof_tint": "#d7aa84",
+          "outline_tint": "#3a4b60"
+        }
+      ]
+    },
+    "queens_west": {
+      "entries": [
+        {
+          "id": "queens_conversion_hub",
+          "weight": 4,
+          "min_level": 1,
+          "archetype_contains": ["conversion", "warehouse"],
+          "height_mult": 1.04,
+          "wall_tint": "#87a0bf",
+          "roof_tint": "#dab189",
+          "outline_tint": "#34465d"
+        },
+        {
+          "id": "queens_glass_midrise",
+          "weight": 2,
+          "min_level": 1,
+          "archetype_contains": ["glass"],
+          "height_mult": 1.02,
+          "wall_tint": "#93a8c4",
+          "roof_tint": "#e1bc94",
+          "outline_tint": "#3a4d64"
+        }
+      ]
+    }
+  },
+  "fallback_set": {
+    "entries": [
+      {
+        "id": "fallback_mixed_block",
+        "weight": 5,
+        "min_level": 1,
+        "height_mult": 1.0,
+        "wall_tint": "#8da1bc",
+        "roof_tint": "#d8b691",
+        "outline_tint": "#35475d"
+      },
+      {
+        "id": "fallback_lowrise_row",
+        "weight": 3,
+        "min_level": 1,
+        "height_mult": 0.9,
+        "wall_tint": "#8799af",
+        "roof_tint": "#c9a07a",
+        "outline_tint": "#3c4e63"
+      }
+    ]
+  }
+}
