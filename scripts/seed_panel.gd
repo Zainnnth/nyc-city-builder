@@ -22,6 +22,7 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
 @onready var econ_pressure: Label = $EconomyPanel/VBox/EconPressure
+@onready var objective_rows: VBoxContainer = $ObjectivesPanel/VBox/ObjectiveRows
 @onready var alert_rows: VBoxContainer = $AlertsPanel/VBox/AlertRows
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
@@ -87,6 +88,7 @@ func _ready() -> void:
 	popup_panel.visible = false
 	_init_slot_ui()
 	_refresh_economy()
+	_refresh_objectives()
 
 func _process(delta: float) -> void:
 	ui_timer += delta
@@ -94,6 +96,7 @@ func _process(delta: float) -> void:
 		ui_timer = 0.0
 		_refresh_demand_bars()
 		_refresh_economy()
+		_refresh_objectives()
 		_refresh_alerts()
 		_update_time_buttons()
 	if autosave_toggle.button_pressed:
@@ -343,6 +346,33 @@ func _refresh_economy() -> void:
 	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
 	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f" % [housing_p, job_p]
+
+func _refresh_objectives() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_objective_snapshot"):
+		return
+
+	var objectives_v: Variant = city_grid.call("get_objective_snapshot")
+	if typeof(objectives_v) != TYPE_ARRAY:
+		return
+	var objectives: Array = objectives_v
+
+	for child in objective_rows.get_children():
+		child.queue_free()
+
+	for objective_v in objectives:
+		if typeof(objective_v) != TYPE_DICTIONARY:
+			continue
+		var objective: Dictionary = objective_v
+		var title: String = String(objective.get("title", "Objective"))
+		var progress: String = String(objective.get("progress", ""))
+		var complete: bool = bool(objective.get("complete", false))
+
+		var label: Label = Label.new()
+		label.text = "%s %s (%s)" % ["[x]" if complete else "[ ]", title, progress]
+		label.modulate = Color(0.60, 0.89, 0.65, 0.98) if complete else Color(0.76, 0.82, 0.93, 0.98)
+		objective_rows.add_child(label)
 
 func _refresh_alerts() -> void:
 	if city_grid == null:

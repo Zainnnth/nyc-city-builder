@@ -74,6 +74,7 @@ var economy_history: Array[Dictionary] = []
 var sim_tick := 0
 const MAX_HISTORY := 90
 var active_alerts: Array[Dictionary] = []
+var positive_cashflow_streak := 0
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -123,6 +124,13 @@ const POLICY_UPKEEP_MULT := {
 	POLICY_GROWTH: 1.06,
 	POLICY_PROFIT: 0.98
 }
+
+const OBJECTIVES := [
+	{"id": "pop_500", "title": "Reach population 500"},
+	{"id": "jobs_350", "title": "Reach jobs 350"},
+	{"id": "cash_12000", "title": "Reach treasury $12,000"},
+	{"id": "cashflow_20", "title": "Maintain positive cashflow for 20 ticks"}
+]
 
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
@@ -340,7 +348,12 @@ func _run_sim_step() -> void:
 
 	var tax_income := int(round(population * 0.7 + jobs * 0.45 + tax_income_raw))
 	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost))
-	money += tax_income - upkeep
+	var net_cashflow := tax_income - upkeep
+	money += net_cashflow
+	if net_cashflow > 0:
+		positive_cashflow_streak += 1
+	else:
+		positive_cashflow_streak = 0
 	sim_tick += 1
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
@@ -392,6 +405,7 @@ func reset_grid() -> void:
 	district_policy_map.clear()
 	economy_history.clear()
 	active_alerts.clear()
+	positive_cashflow_streak = 0
 	sim_tick = 0
 	sim_timer = 0.0
 	sim_speed = 1.0
@@ -572,7 +586,8 @@ func export_state() -> Dictionary:
 		"sim_speed": sim_speed,
 		"sim_paused": sim_paused,
 		"sim_tick": sim_tick,
-		"economy_history": economy_history.duplicate(true)
+		"economy_history": economy_history.duplicate(true),
+		"positive_cashflow_streak": positive_cashflow_streak
 	}
 
 func import_state(state: Dictionary) -> bool:
@@ -642,6 +657,7 @@ func import_state(state: Dictionary) -> bool:
 	sim_speed = float(state.get("sim_speed", 1.0))
 	sim_paused = bool(state.get("sim_paused", false))
 	sim_tick = int(state.get("sim_tick", 0))
+	positive_cashflow_streak = int(state.get("positive_cashflow_streak", 0))
 	economy_history.clear()
 	var history_arr: Array = history_v
 	for point_variant in history_arr:
@@ -758,3 +774,38 @@ func get_active_alerts() -> Array[Dictionary]:
 	for alert in active_alerts:
 		output.append(alert.duplicate(true))
 	return output
+
+func get_objective_snapshot() -> Array[Dictionary]:
+	var snapshot: Array[Dictionary] = []
+	for objective_v in OBJECTIVES:
+		var objective: Dictionary = objective_v
+		var id: String = String(objective.get("id", ""))
+		var title: String = String(objective.get("title", "Objective"))
+		var complete := false
+		var progress_text := ""
+
+		match id:
+			"pop_500":
+				complete = population >= 500
+				progress_text = "%d / 500" % population
+			"jobs_350":
+				complete = jobs >= 350
+				progress_text = "%d / 350" % jobs
+			"cash_12000":
+				complete = money >= 12000
+				progress_text = "$%d / $12000" % money
+			"cashflow_20":
+				complete = positive_cashflow_streak >= 20
+				progress_text = "%d / 20 ticks" % positive_cashflow_streak
+			_:
+				progress_text = "-"
+
+		snapshot.append(
+			{
+				"id": id,
+				"title": title,
+				"complete": complete,
+				"progress": progress_text
+			}
+		)
+	return snapshot
