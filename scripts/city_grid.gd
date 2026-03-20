@@ -76,6 +76,24 @@ const DISTRICT_TINTS := {
 	"outer_borough_mix": Color(0.85, 0.87, 0.92, 1.0)
 }
 
+const DISTRICT_TAX_MULT := {
+	"midtown_core": 1.18,
+	"financial_district": 1.22,
+	"lower_east_side": 1.03,
+	"harlem": 0.98,
+	"queens_west": 1.01,
+	"outer_borough_mix": 1.0
+}
+
+const DISTRICT_UPKEEP_MULT := {
+	"midtown_core": 1.12,
+	"financial_district": 1.15,
+	"lower_east_side": 1.0,
+	"harlem": 0.95,
+	"queens_west": 0.98,
+	"outer_borough_mix": 1.0
+}
+
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
 	draw_rect(Rect2(Vector2.ZERO, map_size), BACKDROP_COLOR, true)
@@ -219,7 +237,9 @@ func _paint_at_mouse_position() -> void:
 func _run_sim_step() -> void:
 	var pop_capacity := 0
 	var job_capacity := 0
-	var road_tiles := 0
+	var road_upkeep_cost := 0.0
+	var zone_upkeep_cost := 0.0
+	var tax_income_raw := 0.0
 
 	connected_residential = 0
 	connected_commercial = 0
@@ -231,7 +251,7 @@ func _run_sim_step() -> void:
 			var i := _to_index(cell)
 
 			if road_by_index[i]:
-				road_tiles += 1
+				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(district_id_by_index[i])
 				continue
 
 			var zone := zone_by_index[i]
@@ -246,22 +266,31 @@ func _run_sim_step() -> void:
 
 			building_level_by_index[i] = min(building_level_by_index[i] + 1, 3)
 			var level := building_level_by_index[i]
+			var district_id: String = district_id_by_index[i]
+			var style_profile: String = style_profile_by_index[i]
+			var growth_mult := _growth_multiplier(style_profile)
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
-				pop_capacity += int(ZONE_CAPACITY[zone]) * level
+				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
+				pop_capacity += max(1, res_cap)
 			else:
 				if zone == Tool.COMMERCIAL:
 					connected_commercial += 1
 				if zone == Tool.INDUSTRIAL:
 					connected_industrial += 1
-				job_capacity += int(ZONE_CAPACITY[zone]) * level
+				var job_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
+				job_capacity += max(1, job_cap)
+
+			var tile_output := (float(level) * 4.0) + 3.0
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id)
+			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id)
 
 	var target_population: int = min(pop_capacity, int(round(job_capacity * 0.9)))
 	population = int(lerp(float(population), float(target_population), 0.42))
 	jobs = int(lerp(float(jobs), float(job_capacity), 0.35))
 
-	var tax_income := int(round(population * 0.9 + jobs * 0.55))
-	var upkeep := road_tiles * 2 + (connected_residential + connected_commercial + connected_industrial)
+	var tax_income := int(round(population * 0.7 + jobs * 0.45 + tax_income_raw))
+	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost))
 	money += tax_income - upkeep
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
@@ -297,6 +326,17 @@ func _is_in_bounds(cell: Vector2i) -> bool:
 
 func _to_index(cell: Vector2i) -> int:
 	return cell.y * columns + cell.x
+
+func reset_grid() -> void:
+	_init_tiles()
+	money = 8000
+	population = 0
+	jobs = 0
+	connected_residential = 0
+	connected_commercial = 0
+	connected_industrial = 0
+	sim_timer = 0.0
+	queue_redraw()
 
 func apply_district_seed(seed_records: Array[Dictionary]) -> void:
 	for record in seed_records:
@@ -346,5 +386,22 @@ func _ensure_adjacent_road(cell: Vector2i) -> void:
 		var idx := _to_index(n)
 		if zone_by_index[idx] == Tool.BULLDOZE and not road_by_index[idx]:
 			road_by_index[idx] = true
+			district_id_by_index[idx] = district_id_by_index[_to_index(cell)]
+			style_profile_by_index[idx] = style_profile_by_index[_to_index(cell)]
 			building_level_by_index[idx] = 0
 			return
+
+func _growth_multiplier(style_profile: String) -> float:
+	if style_profile.find("tower") != -1:
+		return 1.18
+	if style_profile.find("industrial") != -1:
+		return 1.1
+	if style_profile.find("brownstone") != -1:
+		return 0.92
+	return 1.0
+
+func _district_tax_multiplier(district_id: String) -> float:
+	return float(DISTRICT_TAX_MULT.get(district_id, 1.0))
+
+func _district_upkeep_multiplier(district_id: String) -> float:
+	return float(DISTRICT_UPKEEP_MULT.get(district_id, 1.0))

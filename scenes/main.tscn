@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://dxv43pylos7s4"]
+[gd_scene load_steps=5 format=3 uid="uid://dxv43pylos7s4"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_m2tlq"]
 [ext_resource type="Script" path="res://scripts/city_grid.gd" id="2_2s0fj"]
 [ext_resource type="Script" path="res://scripts/district_generator.gd" id="3_lk2hu"]
+[ext_resource type="Script" path="res://scripts/seed_panel.gd" id="4_nd1mf"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_m2tlq")
@@ -19,3 +20,46 @@ script = ExtResource("2_2s0fj")
 [node name="DistrictGenerator" type="Node2D" parent="."]
 position = Vector2(200, 120)
 script = ExtResource("3_lk2hu")
+
+[node name="SeedPanel" type="CanvasLayer" parent="."]
+script = ExtResource("4_nd1mf")
+
+[node name="Panel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 384.0
+offset_bottom = 152.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/Panel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/Panel/VBox"]
+layout_mode = 2
+text = "District Seed Controls"
+
+[node name="SeedRow" type="HBoxContainer" parent="SeedPanel/Panel/VBox"]
+layout_mode = 2
+
+[node name="SeedLabel" type="Label" parent="SeedPanel/Panel/VBox/SeedRow"]
+layout_mode = 2
+text = "Seed:"
+
+[node name="SeedInput" type="LineEdit" parent="SeedPanel/Panel/VBox/SeedRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "1998"
+
+[node name="Controls" type="HBoxContainer" parent="SeedPanel/Panel/VBox"]
+layout_mode = 2
+
+[node name="ApplySeedButton" type="Button" parent="SeedPanel/Panel/VBox/Controls"]
+layout_mode = 2
+text = "Apply Seed"
+
+[node name="RandomSeedButton" type="Button" parent="SeedPanel/Panel/VBox/Controls"]
+layout_mode = 2
+text = "Randomize"
+
+[node name="StatusLabel" type="Label" parent="SeedPanel/Panel/VBox"]
+layout_mode = 2
+text = "Ready."

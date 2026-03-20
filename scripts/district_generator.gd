@@ -23,27 +23,12 @@ const DISTRICT_COLORS := {
 }
 
 func _ready() -> void:
-	rng.seed = int(world_seed)
 	city_grid = get_node_or_null(city_grid_path)
 	if city_grid == null:
 		push_warning("DistrictGenerator: CityGrid not found at path: %s" % city_grid_path)
 		return
 	style_profiles = _load_style_profiles()
-
-	var records := _load_records()
-	if records.is_empty():
-		push_warning("DistrictGenerator: no building records loaded.")
-		return
-
-	var seeded := _map_records_to_grid(records)
-	if seeded.is_empty():
-		push_warning("DistrictGenerator: no mapped building records.")
-		return
-
-	if city_grid.has_method("apply_district_seed"):
-		city_grid.call("apply_district_seed", seeded)
-	_build_overlay(seeded)
-	queue_redraw()
+	regenerate(world_seed, true)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_G:
@@ -270,3 +255,29 @@ func _build_overlay(seed_records: Array[Dictionary]) -> void:
 		var color: Color = DISTRICT_COLORS.get(district_id, DISTRICT_COLORS["outer_borough_mix"])
 		var rect := Rect2(Vector2(cell.x, cell.y) * cell_size, Vector2.ONE * cell_size)
 		overlay_blocks.append({"rect": rect, "color": color})
+
+func get_world_seed() -> int:
+	return int(world_seed)
+
+func regenerate(new_seed: int = -1, initial_load: bool = false) -> void:
+	if new_seed >= 0:
+		world_seed = new_seed
+	rng.seed = int(world_seed)
+
+	if not initial_load and city_grid.has_method("reset_grid"):
+		city_grid.call("reset_grid")
+
+	var records: Array[Dictionary] = _load_records()
+	if records.is_empty():
+		push_warning("DistrictGenerator: no building records loaded.")
+		return
+
+	var seeded: Array[Dictionary] = _map_records_to_grid(records)
+	if seeded.is_empty():
+		push_warning("DistrictGenerator: no mapped building records.")
+		return
+
+	if city_grid.has_method("apply_district_seed"):
+		city_grid.call("apply_district_seed", seeded)
+	_build_overlay(seeded)
+	queue_redraw()

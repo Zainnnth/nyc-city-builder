@@ -24,10 +24,13 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Seeds zones/building levels by district style profile.
   - Expands clusters using `data/runtime/style_profiles.json`.
   - Deterministic generation via `DistrictGenerator.world_seed`.
+- In-game seed panel:
+  - Enter a seed and click `Apply Seed` to regenerate neighborhoods.
+  - Click `Randomize` for a new deterministic layout.
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
   - Population/jobs capacity updates.
-  - Money updates from taxes and upkeep.
+  - Money updates from taxes and upkeep with district/style modifiers.
 - Camera pan with arrow keys.
 - Mouse-wheel zoom.
 - `G` toggles district overlay visualization.
