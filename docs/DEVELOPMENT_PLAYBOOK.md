@@ -41,3 +41,4 @@ A change is ready only if:
 - Difficulty scaling pass (era-themed progression pressure).
 - Save migration/versioning compatibility tests.
 - Optional benchmark harness for large-grid frame/tick budgets.
+- Building asset pipeline: licensed source ingest + procedural massing + landmark integration.

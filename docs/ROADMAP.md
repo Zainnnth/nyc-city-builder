@@ -53,3 +53,20 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Performance pass for larger grids and longer sessions
 - [x] Release automation for tagged builds
 - [x] Deterministic simulation assertions expansion
+
+## Phase 6 - Gameplay Depth (Next)
+
+- [ ] Goal-card win/loss validation hooks in simulation objectives
+- [ ] Difficulty scaling by district era/theme progression
+- [ ] Save migration/versioning hardening for future schema changes
+- [ ] Optional benchmark scene for large-grid perf telemetry
+
+## Phase 7 - Building Asset Pipeline
+
+- [ ] Asset source policy and license allowlist (no Google Earth extraction)
+- [ ] NYC building dataset ingest for footprint + height + district tagging
+- [ ] Procedural massing generator (footprint -> lowpoly mesh kit) for fast coverage
+- [ ] Hand-authored landmark pack (hero buildings) with LODs
+- [ ] Cel-shaded material/shader pass for late-90s/early-2000s look
+- [ ] District-based prefab set assignment and weighted spawn rules
+- [ ] Godot import presets + optimization (LODs, occlusion, batching checks)
