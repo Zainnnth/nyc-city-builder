@@ -63,3 +63,19 @@ text = "Randomize"
 [node name="StatusLabel" type="Label" parent="SeedPanel/Panel/VBox"]
 layout_mode = 2
 text = "Ready."
+
+[node name="DemandPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 14.0
+offset_top = 166.0
+offset_right = 384.0
+offset_bottom = 468.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/DemandPanel"]
+layout_mode = 2
+
+[node name="DemandTitle" type="Label" parent="SeedPanel/DemandPanel/VBox"]
+layout_mode = 2
+text = "District Demand Index"
+
+[node name="DemandRows" type="VBoxContainer" parent="SeedPanel/DemandPanel/VBox"]
+layout_mode = 2

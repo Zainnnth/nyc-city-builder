@@ -66,6 +66,7 @@ var jobs := 0
 var connected_residential := 0
 var connected_commercial := 0
 var connected_industrial := 0
+var district_demand_snapshot: Array[Dictionary] = []
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -240,6 +241,7 @@ func _run_sim_step() -> void:
 	var road_upkeep_cost := 0.0
 	var zone_upkeep_cost := 0.0
 	var tax_income_raw := 0.0
+	var district_stats := {}
 
 	connected_residential = 0
 	connected_commercial = 0
@@ -260,30 +262,42 @@ func _run_sim_step() -> void:
 				continue
 
 			var connected := _is_adjacent_to_road(cell)
+			var district_id: String = district_id_by_index[i]
+			_ensure_district_stat(district_stats, district_id)
+			var stat: Dictionary = district_stats[district_id]
+			stat["zone_total"] = int(stat["zone_total"]) + 1
+			if connected:
+				stat["connected"] = int(stat["connected"]) + 1
+
 			if not connected:
 				building_level_by_index[i] = max(building_level_by_index[i] - 1, 0)
+				district_stats[district_id] = stat
 				continue
 
 			building_level_by_index[i] = min(building_level_by_index[i] + 1, 3)
 			var level := building_level_by_index[i]
-			var district_id: String = district_id_by_index[i]
 			var style_profile: String = style_profile_by_index[i]
 			var growth_mult := _growth_multiplier(style_profile)
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
 				pop_capacity += max(1, res_cap)
+				stat["res_zones"] = int(stat["res_zones"]) + 1
 			else:
 				if zone == Tool.COMMERCIAL:
 					connected_commercial += 1
+					stat["com_zones"] = int(stat["com_zones"]) + 1
 				if zone == Tool.INDUSTRIAL:
 					connected_industrial += 1
+					stat["ind_zones"] = int(stat["ind_zones"]) + 1
 				var job_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
 				job_capacity += max(1, job_cap)
 
 			var tile_output := (float(level) * 4.0) + 3.0
 			tax_income_raw += tile_output * _district_tax_multiplier(district_id)
 			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id)
+			stat["level_sum"] = int(stat["level_sum"]) + level
+			district_stats[district_id] = stat
 
 	var target_population: int = min(pop_capacity, int(round(job_capacity * 0.9)))
 	population = int(lerp(float(population), float(target_population), 0.42))
@@ -292,6 +306,7 @@ func _run_sim_step() -> void:
 	var tax_income := int(round(population * 0.7 + jobs * 0.45 + tax_income_raw))
 	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost))
 	money += tax_income - upkeep
+	_update_district_demand_snapshot(district_stats)
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
 	var neighbors := [
@@ -335,6 +350,7 @@ func reset_grid() -> void:
 	connected_residential = 0
 	connected_commercial = 0
 	connected_industrial = 0
+	district_demand_snapshot.clear()
 	sim_timer = 0.0
 	queue_redraw()
 
@@ -405,3 +421,62 @@ func _district_tax_multiplier(district_id: String) -> float:
 
 func _district_upkeep_multiplier(district_id: String) -> float:
 	return float(DISTRICT_UPKEEP_MULT.get(district_id, 1.0))
+
+func _ensure_district_stat(stats: Dictionary, district_id: String) -> void:
+	if stats.has(district_id):
+		return
+	stats[district_id] = {
+		"district_id": district_id,
+		"zone_total": 0,
+		"connected": 0,
+		"res_zones": 0,
+		"com_zones": 0,
+		"ind_zones": 0,
+		"level_sum": 0
+	}
+
+func _update_district_demand_snapshot(stats: Dictionary) -> void:
+	district_demand_snapshot.clear()
+
+	var housing_pressure: float = clamp((float(jobs) + 1.0) / (float(population) + 1.0), 0.55, 1.9)
+	var job_pressure: float = clamp((float(population) + 1.0) / (float(jobs) + 1.0), 0.55, 1.9)
+
+	for district_key in stats.keys():
+		var district_id: String = String(district_key)
+		var stat: Dictionary = stats[district_id]
+		var total: int = int(stat["zone_total"])
+		if total <= 0:
+			continue
+
+		var connected: int = int(stat["connected"])
+		var connected_ratio: float = float(connected) / float(total)
+		var res_share: float = float(stat["res_zones"]) / float(total)
+		var com_share: float = float(stat["com_zones"]) / float(total)
+		var ind_share: float = float(stat["ind_zones"]) / float(total)
+		var avg_level: float = float(stat["level_sum"]) / float(max(connected, 1))
+		var maturity_factor: float = clamp(avg_level / 3.0, 0.0, 1.0)
+
+		var res_demand: float = clamp(50.0 + (housing_pressure - 1.0) * 38.0 + (1.0 - res_share) * 10.0 + (connected_ratio - 0.5) * 14.0, 0.0, 100.0)
+		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0, 0.0, 100.0)
+		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0, 0.0, 100.0)
+		var composite: float = clamp((res_demand * 0.4) + (com_demand * 0.35) + (ind_demand * 0.25), 0.0, 100.0)
+
+		district_demand_snapshot.append(
+			{
+				"district_id": district_id,
+				"demand_index": composite,
+				"res_demand": res_demand,
+				"com_demand": com_demand,
+				"ind_demand": ind_demand
+			}
+		)
+
+	district_demand_snapshot.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("demand_index", 0.0)) > float(b.get("demand_index", 0.0))
+	)
+
+func get_district_demand_snapshot() -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	for item in district_demand_snapshot:
+		output.append(item.duplicate(true))
+	return output

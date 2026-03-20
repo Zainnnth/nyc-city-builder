@@ -147,8 +147,8 @@ func _lookup_district(lon: float, lat: float, districts_cfg: Dictionary, fallbac
 
 func _map_records_to_grid(records: Array[Dictionary]) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	var columns := int(city_grid.get("columns"))
-	var rows := int(city_grid.get("rows"))
+	var columns: int = city_grid.get("columns")
+	var rows: int = city_grid.get("rows")
 	if columns <= 0 or rows <= 0:
 		return result
 
