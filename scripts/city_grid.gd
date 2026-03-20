@@ -234,7 +234,7 @@ func _run_sim_step() -> void:
 					connected_industrial += 1
 				job_capacity += int(ZONE_CAPACITY[zone]) * level
 
-	var target_population := min(pop_capacity, int(round(job_capacity * 0.9)))
+	var target_population: int = min(pop_capacity, int(round(job_capacity * 0.9)))
 	population = int(lerp(float(population), float(target_population), 0.42))
 	jobs = int(lerp(float(jobs), float(job_capacity), 0.35))
 
@@ -251,7 +251,7 @@ func _is_adjacent_to_road(cell: Vector2i) -> bool:
 	]
 
 	for dir in neighbors:
-		var n := cell + dir
+		var n: Vector2i = cell + dir
 		if _is_in_bounds(n) and road_by_index[_to_index(n)]:
 			return true
 	return false
@@ -310,7 +310,7 @@ func _ensure_adjacent_road(cell: Vector2i) -> void:
 	]
 
 	for dir in neighbors:
-		var n := cell + dir
+		var n: Vector2i = cell + dir
 		if not _is_in_bounds(n):
 			continue
 		var idx := _to_index(n)

@@ -81,8 +81,8 @@ func _extract_records(payload: Dictionary, needs_district_lookup: bool) -> Array
 		fallback_id = String(districts_cfg["fallback_district_id"])
 
 	for feature in payload.get("features", []):
-		var props := feature.get("properties", {})
-		var geom := feature.get("geometry", {})
+		var props: Dictionary = feature.get("properties", {})
+		var geom: Dictionary = feature.get("geometry", {})
 		var centroid := _extract_centroid(props, geom)
 		var district_id := String(props.get("district_id", ""))
 		var style_profile := String(props.get("style_profile", ""))

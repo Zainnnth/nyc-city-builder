@@ -30,5 +30,5 @@ func _unhandled_input(event: InputEvent) -> void:
 			_apply_zoom(ZOOM_STEP)
 
 func _apply_zoom(delta: float) -> void:
-	var new_zoom := clamp(camera.zoom.x + delta, ZOOM_MIN, ZOOM_MAX)
+	var new_zoom: float = clamp(camera.zoom.x + delta, ZOOM_MIN, ZOOM_MAX)
 	camera.zoom = Vector2(new_zoom, new_zoom)
