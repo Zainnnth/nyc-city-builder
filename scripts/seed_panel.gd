@@ -19,6 +19,7 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var preset_balanced_button: Button = $Panel/VBox/Presets/BalancedPresetButton
 @onready var preset_midtown_button: Button = $Panel/VBox/Presets/MidtownPresetButton
 @onready var preset_boroughs_button: Button = $Panel/VBox/Presets/BoroughPresetButton
+@onready var balance_profile_select: OptionButton = $Panel/VBox/BalanceRow/BalanceProfileSelect
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var police_slider: HSlider = $ServicesPanel/VBox/PoliceRow/PoliceSlider
@@ -64,6 +65,7 @@ var autosave_next_slot := 1
 const AUTOSAVE_INTERVAL := 20.0
 var banner_acknowledged := false
 var is_syncing_services := false
+var is_syncing_balance := false
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -141,6 +143,7 @@ func _ready() -> void:
 	preset_balanced_button.pressed.connect(_on_apply_preset.bind("balanced"))
 	preset_midtown_button.pressed.connect(_on_apply_preset.bind("midtown_boom"))
 	preset_boroughs_button.pressed.connect(_on_apply_preset.bind("borough_buildout"))
+	balance_profile_select.item_selected.connect(_on_balance_profile_selected)
 	police_slider.value_changed.connect(_on_service_changed.bind("police"))
 	fire_slider.value_changed.connect(_on_service_changed.bind("fire"))
 	sanitation_slider.value_changed.connect(_on_service_changed.bind("sanitation"))
@@ -156,6 +159,7 @@ func _ready() -> void:
 	milestone_banner.visible = false
 	_apply_retro_ui_theme()
 	_init_slot_ui()
+	_init_balance_profiles()
 	_init_overlay_ui()
 	_refresh_service_controls()
 	_refresh_economy()
@@ -170,6 +174,7 @@ func _process(delta: float) -> void:
 		_refresh_service_controls()
 		_refresh_overlay_controls()
 		_refresh_economy()
+		_refresh_balance_profile()
 		_refresh_event_panel()
 		_refresh_objectives()
 		_refresh_alerts()
@@ -351,6 +356,62 @@ func _on_set_policy(policy_id: String) -> void:
 	_show_popup(focused_district_id, row_data)
 	status_label.text = "Policy set: %s" % String(POLICY_LABELS.get(policy_id, policy_id))
 
+func _init_balance_profiles() -> void:
+	balance_profile_select.clear()
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_balance_profiles"):
+		return
+
+	var profiles_v: Variant = city_grid.call("get_balance_profiles")
+	if typeof(profiles_v) != TYPE_DICTIONARY:
+		return
+	var profiles: Dictionary = profiles_v
+	var keys: Array[String] = []
+	for key in profiles.keys():
+		keys.append(String(key))
+	keys.sort()
+	for profile_id in keys:
+		var profile_v: Variant = profiles.get(profile_id, {})
+		var profile: Dictionary = profile_v if typeof(profile_v) == TYPE_DICTIONARY else {}
+		var name: String = String(profile.get("display_name", profile_id.capitalize()))
+		balance_profile_select.add_item(name, balance_profile_select.get_item_count())
+		var idx: int = balance_profile_select.get_item_count() - 1
+		balance_profile_select.set_item_metadata(idx, profile_id)
+	_refresh_balance_profile()
+
+func _on_balance_profile_selected(index: int) -> void:
+	if is_syncing_balance:
+		return
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_balance_profile"):
+		return
+	if index < 0 or index >= balance_profile_select.get_item_count():
+		return
+	var profile_id: String = String(balance_profile_select.get_item_metadata(index))
+	var ok: bool = city_grid.call("set_balance_profile", profile_id)
+	if ok:
+		status_label.text = "Balance profile set: %s" % balance_profile_select.get_item_text(index)
+	else:
+		status_label.text = "Invalid balance profile."
+	_refresh_balance_profile()
+
+func _refresh_balance_profile() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_balance_profile_id"):
+		return
+	var active_id: String = String(city_grid.call("get_balance_profile_id"))
+	is_syncing_balance = true
+	for i in range(balance_profile_select.get_item_count()):
+		var profile_id: String = String(balance_profile_select.get_item_metadata(i))
+		if profile_id == active_id:
+			if balance_profile_select.selected != i:
+				balance_profile_select.select(i)
+			break
+	is_syncing_balance = false
+
 func _init_slot_ui() -> void:
 	slot_select.clear()
 	slot_select.add_item("Slot 1", 1)
@@ -427,6 +488,7 @@ func _refresh_economy() -> void:
 	var housing_p: float = float(snap.get("housing_pressure", 1.0))
 	var job_p: float = float(snap.get("job_pressure", 1.0))
 	var avg_upkeep_hook: float = float(snap.get("avg_upkeep_hook", 1.0))
+	var balance_profile_id: String = String(snap.get("balance_profile_id", "standard"))
 	var event_title: String = String(snap.get("active_event_title", "None"))
 	var event_district: String = String(snap.get("active_event_district", ""))
 	var event_ticks_left: int = int(snap.get("event_ticks_left", 0))
@@ -434,7 +496,7 @@ func _refresh_economy() -> void:
 	econ_money.text = "Money: $%d (%s%d)" % [money, "+" if d_money >= 0 else "", d_money]
 	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
-	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f  |  Upkeep x%.2f" % [housing_p, job_p, avg_upkeep_hook]
+	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f  |  Upkeep x%.2f  |  Balance %s" % [housing_p, job_p, avg_upkeep_hook, balance_profile_id]
 	if event_title != "None":
 		econ_pressure.text += "  |  %s (%s, %dt)" % [event_title, event_district, event_ticks_left]
 

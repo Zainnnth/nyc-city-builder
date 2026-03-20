@@ -99,6 +99,8 @@ var avg_noise := 0.0
 var avg_crime := 0.0
 var district_upkeep_hook_map: Dictionary = {}
 var district_identity_profiles: Dictionary = {}
+var balance_profiles: Dictionary = {}
+var current_balance_profile_id := "standard"
 var service_levels := {
 	"police": 55.0,
 	"fire": 55.0,
@@ -189,6 +191,33 @@ const EVENT_BASE_DURATION := {
 	EVENT_HEATWAVE: 12
 }
 
+const DEFAULT_BALANCE_PROFILES := {
+	"standard": {
+		"display_name": "Standard",
+		"growth_mult": 1.0,
+		"tax_income_mult": 1.0,
+		"upkeep_mult": 1.0,
+		"event_chance_mult": 1.0,
+		"cash_objective_mult": 1.0
+	},
+	"civic_push": {
+		"display_name": "Civic Push",
+		"growth_mult": 1.08,
+		"tax_income_mult": 1.05,
+		"upkeep_mult": 0.94,
+		"event_chance_mult": 0.88,
+		"cash_objective_mult": 1.0
+	},
+	"austerity_crunch": {
+		"display_name": "Austerity Crunch",
+		"growth_mult": 0.92,
+		"tax_income_mult": 0.95,
+		"upkeep_mult": 1.12,
+		"event_chance_mult": 1.18,
+		"cash_objective_mult": 1.12
+	}
+}
+
 var overlay_mode := OVERLAY_NONE
 var overlay_alpha := 0.42
 var atmosphere_time := 0.0
@@ -213,6 +242,7 @@ func _draw() -> void:
 
 func _ready() -> void:
 	sim_rng.randomize()
+	_balance_profiles_from_default()
 	_init_tiles()
 	queue_redraw()
 
@@ -529,6 +559,9 @@ func _run_sim_step() -> void:
 	var crime_sum := 0.0
 	var metric_samples := 0
 	var road_count: int = int(road_graph.get("road_count", 0))
+	var balance_growth_mult: float = _balance_growth_multiplier()
+	var balance_tax_mult: float = _balance_tax_multiplier()
+	var balance_upkeep_mult: float = _balance_upkeep_multiplier()
 	road_cluster_count = int(road_graph.get("component_count", 0))
 	largest_road_cluster = int(road_graph.get("largest_cluster", 0))
 	road_efficiency = 1.0 if road_count <= 0 else float(largest_road_cluster) / float(road_count)
@@ -545,7 +578,7 @@ func _run_sim_step() -> void:
 			if road_by_index[i]:
 				var road_district_id: String = district_id_by_index[i]
 				var district_upkeep_hook: float = float(district_upkeep_hook_map.get(road_district_id, 1.0))
-				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(road_district_id) * district_upkeep_hook * _event_upkeep_multiplier(road_district_id)
+				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(road_district_id) * district_upkeep_hook * _event_upkeep_multiplier(road_district_id) * balance_upkeep_mult
 				land_value_by_index[i] = 42.0
 				noise_by_index[i] = 26.0
 				crime_by_index[i] = 14.0 + (1.0 - _service_norm("police")) * 18.0
@@ -595,7 +628,7 @@ func _run_sim_step() -> void:
 			var identity_noise_mult: float = _identity_noise_penalty_multiplier(identity_profile)
 			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
 			var zone_service_mult: float = _zone_service_multiplier(zone)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id) * identity_growth_mult
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id) * identity_growth_mult * balance_growth_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -614,8 +647,8 @@ func _run_sim_step() -> void:
 			var tile_output := (float(level) * 4.0) + 3.0
 			var district_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
 			var live_upkeep_hook: float = clamp(1.0 + commute_penalty * 0.35 + (1.0 - zone_service_mult) * 0.28, 0.85, 1.7)
-			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id) * identity_tax_mult
-			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id)
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id) * identity_tax_mult * balance_tax_mult
+			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id) * balance_upkeep_mult
 			service_upkeep_cost += _zone_service_cost(zone)
 			stat["level_sum"] = int(stat["level_sum"]) + level
 			stat["traffic_penalty_sum"] = float(stat["traffic_penalty_sum"]) + commute_penalty
@@ -882,6 +915,8 @@ func reset_grid() -> void:
 	avg_land_value = 0.0
 	avg_noise = 0.0
 	avg_crime = 0.0
+	_balance_profiles_from_default()
+	current_balance_profile_id = "standard"
 	district_upkeep_hook_map.clear()
 	service_levels["police"] = 55.0
 	service_levels["fire"] = 55.0
@@ -1081,6 +1116,74 @@ func _policy_tax_multiplier(policy_id: String) -> float:
 func _policy_upkeep_multiplier(policy_id: String) -> float:
 	return float(POLICY_UPKEEP_MULT.get(policy_id, 1.0))
 
+func _balance_profiles_from_default() -> void:
+	balance_profiles = DEFAULT_BALANCE_PROFILES.duplicate(true)
+	if not balance_profiles.has(current_balance_profile_id):
+		current_balance_profile_id = "standard"
+
+func set_balance_profiles(payload: Dictionary) -> void:
+	if payload.is_empty():
+		_balance_profiles_from_default()
+		return
+	var source_profiles_v: Variant = payload.get("profiles", payload)
+	if typeof(source_profiles_v) != TYPE_DICTIONARY:
+		_balance_profiles_from_default()
+		return
+	balance_profiles = Dictionary(source_profiles_v).duplicate(true)
+	if balance_profiles.is_empty():
+		_balance_profiles_from_default()
+		return
+	if not balance_profiles.has(current_balance_profile_id):
+		if balance_profiles.has("standard"):
+			current_balance_profile_id = "standard"
+		else:
+			var first_key: Variant = balance_profiles.keys()[0]
+			current_balance_profile_id = String(first_key)
+
+func set_balance_profile(profile_id: String) -> bool:
+	if profile_id == "":
+		return false
+	if not balance_profiles.has(profile_id):
+		return false
+	current_balance_profile_id = profile_id
+	return true
+
+func get_balance_profile_id() -> String:
+	return current_balance_profile_id
+
+func get_balance_profiles() -> Dictionary:
+	return balance_profiles.duplicate(true)
+
+func get_balance_profile_snapshot() -> Dictionary:
+	return {
+		"profile_id": current_balance_profile_id,
+		"profile": _balance_profile(),
+		"profiles": balance_profiles.duplicate(true)
+	}
+
+func _balance_profile() -> Dictionary:
+	if balance_profiles.has(current_balance_profile_id):
+		return Dictionary(balance_profiles[current_balance_profile_id])
+	if balance_profiles.has("standard"):
+		return Dictionary(balance_profiles["standard"])
+	return Dictionary(DEFAULT_BALANCE_PROFILES["standard"])
+
+func _balance_growth_multiplier() -> float:
+	return clamp(float(_balance_profile().get("growth_mult", 1.0)), 0.7, 1.4)
+
+func _balance_tax_multiplier() -> float:
+	return clamp(float(_balance_profile().get("tax_income_mult", 1.0)), 0.7, 1.4)
+
+func _balance_upkeep_multiplier() -> float:
+	return clamp(float(_balance_profile().get("upkeep_mult", 1.0)), 0.7, 1.6)
+
+func _balance_event_chance_multiplier() -> float:
+	return clamp(float(_balance_profile().get("event_chance_mult", 1.0)), 0.6, 1.6)
+
+func _cash_objective_target() -> int:
+	var mult: float = clamp(float(_balance_profile().get("cash_objective_mult", 1.0)), 0.8, 1.6)
+	return int(round(12000.0 * mult))
+
 func set_service_level(service_id: String, level: float) -> void:
 	if not service_levels.has(service_id):
 		return
@@ -1230,7 +1333,8 @@ func _update_event_system(stats: Dictionary) -> void:
 		return
 	if stats.is_empty():
 		return
-	if sim_rng.randf() > 0.055:
+	var spawn_chance: float = 0.055 * _balance_event_chance_multiplier()
+	if sim_rng.randf() > clamp(spawn_chance, 0.01, 0.2):
 		return
 
 	var district_candidates: Array[String] = []
@@ -1389,6 +1493,8 @@ func export_state() -> Dictionary:
 		"district_policy_map": district_policy_map.duplicate(true),
 		"district_upkeep_hook_map": district_upkeep_hook_map.duplicate(true),
 		"district_identity_profiles": district_identity_profiles.duplicate(true),
+		"balance_profiles": balance_profiles.duplicate(true),
+		"current_balance_profile_id": current_balance_profile_id,
 		"service_levels": service_levels.duplicate(true),
 		"overlay_mode": overlay_mode,
 		"active_event_id": active_event_id,
@@ -1423,6 +1529,8 @@ func import_state(state: Dictionary) -> bool:
 	var policies_v: Variant = state.get("district_policy_map", {})
 	var upkeep_hooks_v: Variant = state.get("district_upkeep_hook_map", {})
 	var identity_profiles_v: Variant = state.get("district_identity_profiles", null)
+	var balance_profiles_v: Variant = state.get("balance_profiles", null)
+	var balance_profile_id_v: Variant = state.get("current_balance_profile_id", "standard")
 	var services_v: Variant = state.get("service_levels", {})
 	var recent_events_v: Variant = state.get("recent_events", [])
 	var history_v: Variant = state.get("economy_history", [])
@@ -1446,6 +1554,8 @@ func import_state(state: Dictionary) -> bool:
 	if typeof(policies_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(upkeep_hooks_v) != TYPE_DICTIONARY:
+		return false
+	if balance_profiles_v != null and typeof(balance_profiles_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
 		return false
@@ -1513,6 +1623,18 @@ func import_state(state: Dictionary) -> bool:
 	district_upkeep_hook_map = Dictionary(upkeep_hooks_v).duplicate(true)
 	if typeof(identity_profiles_v) == TYPE_DICTIONARY:
 		district_identity_profiles = Dictionary(identity_profiles_v).duplicate(true)
+	if typeof(balance_profiles_v) == TYPE_DICTIONARY:
+		balance_profiles = Dictionary(balance_profiles_v).duplicate(true)
+	else:
+		_balance_profiles_from_default()
+	if balance_profiles.is_empty():
+		_balance_profiles_from_default()
+	current_balance_profile_id = String(balance_profile_id_v)
+	if not balance_profiles.has(current_balance_profile_id):
+		if balance_profiles.has("standard"):
+			current_balance_profile_id = "standard"
+		else:
+			current_balance_profile_id = String(balance_profiles.keys()[0])
 	var service_dict: Dictionary = Dictionary(services_v)
 	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
@@ -1630,6 +1752,7 @@ func get_economy_snapshot() -> Dictionary:
 		"housing_pressure": housing_pressure,
 		"job_pressure": job_pressure,
 		"avg_upkeep_hook": _average_upkeep_hook(),
+		"balance_profile_id": current_balance_profile_id,
 		"active_event_title": String(EVENT_TITLES.get(active_event_id, "None")) if active_event_id != "" else "None",
 		"active_event_district": active_event_district,
 		"event_ticks_left": active_event_ticks_left,
@@ -1709,6 +1832,7 @@ func get_active_alerts() -> Array[Dictionary]:
 func get_objective_snapshot() -> Array[Dictionary]:
 	var snapshot: Array[Dictionary] = []
 	var completed_count := 0
+	var cash_target: int = _cash_objective_target()
 	for objective_v in OBJECTIVES:
 		var objective: Dictionary = objective_v
 		var id: String = String(objective.get("id", ""))
@@ -1724,8 +1848,9 @@ func get_objective_snapshot() -> Array[Dictionary]:
 				complete = jobs >= 350
 				progress_text = "%d / 350" % jobs
 			"cash_12000":
-				complete = money >= 12000
-				progress_text = "$%d / $12000" % money
+				complete = money >= cash_target
+				title = "Reach treasury $%d" % cash_target
+				progress_text = "$%d / $%d" % [money, cash_target]
 			"cashflow_20":
 				complete = positive_cashflow_streak >= 20
 				progress_text = "%d / 20 ticks" % positive_cashflow_streak

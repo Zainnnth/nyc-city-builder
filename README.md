@@ -44,6 +44,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - `Balanced Preset`
     - `Midtown Boom`
     - `Borough Buildout`
+  - Balance profile tuning:
+    - `Standard`, `Civic Push`, `Austerity Crunch`
+    - Adjusts growth/tax/upkeep/event pressure and cash objective target
   - Service layer controls:
     - `Police`, `Fire`, `Sanitation`, `Transit` sliders
     - Directly influence growth, upkeep, demand stress, and alerts

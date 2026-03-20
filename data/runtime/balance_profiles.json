@@ -1,0 +1,28 @@
+{
+  "profiles": {
+    "standard": {
+      "display_name": "Standard",
+      "growth_mult": 1.0,
+      "tax_income_mult": 1.0,
+      "upkeep_mult": 1.0,
+      "event_chance_mult": 1.0,
+      "cash_objective_mult": 1.0
+    },
+    "civic_push": {
+      "display_name": "Civic Push",
+      "growth_mult": 1.08,
+      "tax_income_mult": 1.05,
+      "upkeep_mult": 0.94,
+      "event_chance_mult": 0.88,
+      "cash_objective_mult": 1.0
+    },
+    "austerity_crunch": {
+      "display_name": "Austerity Crunch",
+      "growth_mult": 0.92,
+      "tax_income_mult": 0.95,
+      "upkeep_mult": 1.12,
+      "event_chance_mult": 1.18,
+      "cash_objective_mult": 1.12
+    }
+  }
+}
