@@ -32,6 +32,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Updates continuously from simulation telemetry.
   - `Focus District` jumps camera to that neighborhood cluster.
   - Opens district detail popup with demand breakdown.
+  - District policy buttons in popup:
+    - `Balanced` default
+    - `Growth` (faster build-up, weaker tax efficiency)
+    - `Profit` (stronger tax efficiency, slower growth)
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
   - Population/jobs capacity updates.

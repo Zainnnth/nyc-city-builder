@@ -13,12 +13,18 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
 @onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
+@onready var popup_policy: Label = $DistrictPopup/VBox/PopupPolicy
+@onready var policy_balanced_button: Button = $DistrictPopup/VBox/PolicyButtons/BalancedButton
+@onready var policy_growth_button: Button = $DistrictPopup/VBox/PolicyButtons/GrowthButton
+@onready var policy_profit_button: Button = $DistrictPopup/VBox/PolicyButtons/ProfitButton
 @onready var close_popup_button: Button = $DistrictPopup/VBox/ClosePopupButton
 
 var district_generator: Node2D
 var city_grid: Node2D
 var rng := RandomNumberGenerator.new()
 var ui_timer := 0.0
+var focused_district_id := ""
+var focused_row_data: Dictionary = {}
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -27,6 +33,12 @@ const DISTRICT_NAMES := {
 	"harlem": "Harlem",
 	"queens_west": "Queens West",
 	"outer_borough_mix": "Outer Mix"
+}
+
+const POLICY_LABELS := {
+	"balanced": "Balanced",
+	"growth": "Growth",
+	"profit": "Profit"
 }
 
 func _ready() -> void:
@@ -45,6 +57,9 @@ func _ready() -> void:
 	random_button.pressed.connect(_on_random_seed)
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
+	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
+	policy_growth_button.pressed.connect(_on_set_policy.bind("growth"))
+	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
 	popup_panel.visible = false
 
 func _process(delta: float) -> void:
@@ -105,6 +120,7 @@ func _refresh_demand_bars() -> void:
 		var district_id: String = String(row_data.get("district_id", "outer_borough_mix"))
 		var display_name: String = String(DISTRICT_NAMES.get(district_id, district_id))
 		var demand: float = float(row_data.get("demand_index", 0.0))
+		var policy_id: String = String(row_data.get("policy_id", "balanced"))
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -123,7 +139,9 @@ func _refresh_demand_bars() -> void:
 
 		var sub: Label = Label.new()
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
-		sub.text = "R %d  C %d  I %d" % [res_d, com_d, ind_d]
+		sub.text = "R %d  C %d  I %d  |  %s" % [
+			res_d, com_d, ind_d, String(POLICY_LABELS.get(policy_id, "Balanced"))
+		]
 		row.add_child(sub)
 
 		var focus_button: Button = Button.new()
@@ -141,6 +159,8 @@ func _on_focus_district(district_id: String, row_data: Dictionary) -> void:
 
 	var target: Vector2 = district_generator.call("get_district_focus_point", district_id)
 	district_focus_requested.emit(target)
+	focused_district_id = district_id
+	focused_row_data = row_data.duplicate(true)
 	_show_popup(district_id, row_data)
 	status_label.text = "Focused %s." % String(DISTRICT_NAMES.get(district_id, district_id))
 
@@ -150,12 +170,27 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 	var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 	var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
+	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name
 	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d" % [
 		demand, res_d, com_d, ind_d
 	]
+	popup_policy.text = "Policy: %s" % String(POLICY_LABELS.get(policy_id, "Balanced"))
 	popup_panel.visible = true
 
 func _on_close_popup() -> void:
 	popup_panel.visible = false
+
+func _on_set_policy(policy_id: String) -> void:
+	if focused_district_id == "":
+		return
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_district_policy"):
+		return
+	city_grid.call("set_district_policy", focused_district_id, policy_id)
+	var row_data := focused_row_data.duplicate(true)
+	row_data["policy_id"] = policy_id
+	_show_popup(focused_district_id, row_data)
+	status_label.text = "Policy set: %s" % String(POLICY_LABELS.get(policy_id, policy_id))

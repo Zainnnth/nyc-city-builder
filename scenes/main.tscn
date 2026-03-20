@@ -98,6 +98,25 @@ text = "District"
 layout_mode = 2
 text = "Demand details."
 
+[node name="PopupPolicy" type="Label" parent="SeedPanel/DistrictPopup/VBox"]
+layout_mode = 2
+text = "Policy: Balanced"
+
+[node name="PolicyButtons" type="HBoxContainer" parent="SeedPanel/DistrictPopup/VBox"]
+layout_mode = 2
+
+[node name="BalancedButton" type="Button" parent="SeedPanel/DistrictPopup/VBox/PolicyButtons"]
+layout_mode = 2
+text = "Balanced"
+
+[node name="GrowthButton" type="Button" parent="SeedPanel/DistrictPopup/VBox/PolicyButtons"]
+layout_mode = 2
+text = "Growth"
+
+[node name="ProfitButton" type="Button" parent="SeedPanel/DistrictPopup/VBox/PolicyButtons"]
+layout_mode = 2
+text = "Profit"
+
 [node name="ClosePopupButton" type="Button" parent="SeedPanel/DistrictPopup/VBox"]
 layout_mode = 2
 text = "Close"

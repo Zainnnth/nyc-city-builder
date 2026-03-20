@@ -67,6 +67,7 @@ var connected_residential := 0
 var connected_commercial := 0
 var connected_industrial := 0
 var district_demand_snapshot: Array[Dictionary] = []
+var district_policy_map: Dictionary = {}
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -93,6 +94,28 @@ const DISTRICT_UPKEEP_MULT := {
 	"harlem": 0.95,
 	"queens_west": 0.98,
 	"outer_borough_mix": 1.0
+}
+
+const POLICY_BALANCED := "balanced"
+const POLICY_GROWTH := "growth"
+const POLICY_PROFIT := "profit"
+
+const POLICY_GROWTH_MULT := {
+	POLICY_BALANCED: 1.0,
+	POLICY_GROWTH: 1.15,
+	POLICY_PROFIT: 0.9
+}
+
+const POLICY_TAX_MULT := {
+	POLICY_BALANCED: 1.0,
+	POLICY_GROWTH: 0.92,
+	POLICY_PROFIT: 1.12
+}
+
+const POLICY_UPKEEP_MULT := {
+	POLICY_BALANCED: 1.0,
+	POLICY_GROWTH: 1.06,
+	POLICY_PROFIT: 0.98
 }
 
 func _draw() -> void:
@@ -277,7 +300,8 @@ func _run_sim_step() -> void:
 			building_level_by_index[i] = min(building_level_by_index[i] + 1, 3)
 			var level := building_level_by_index[i]
 			var style_profile: String = style_profile_by_index[i]
-			var growth_mult := _growth_multiplier(style_profile)
+			var policy_id: String = get_district_policy(district_id)
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id)
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -294,8 +318,8 @@ func _run_sim_step() -> void:
 				job_capacity += max(1, job_cap)
 
 			var tile_output := (float(level) * 4.0) + 3.0
-			tax_income_raw += tile_output * _district_tax_multiplier(district_id)
-			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id)
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id)
+			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id)
 			stat["level_sum"] = int(stat["level_sum"]) + level
 			district_stats[district_id] = stat
 
@@ -351,6 +375,7 @@ func reset_grid() -> void:
 	connected_commercial = 0
 	connected_industrial = 0
 	district_demand_snapshot.clear()
+	district_policy_map.clear()
 	sim_timer = 0.0
 	queue_redraw()
 
@@ -371,6 +396,8 @@ func apply_district_seed(seed_records: Array[Dictionary]) -> void:
 		building_level_by_index[index] = clampi(int(record.get("seed_level", 1)), 1, 3)
 		district_id_by_index[index] = district_id
 		style_profile_by_index[index] = style_profile
+		if not district_policy_map.has(district_id):
+			district_policy_map[district_id] = POLICY_BALANCED
 		_ensure_adjacent_road(cell)
 
 	queue_redraw()
@@ -460,10 +487,12 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0, 0.0, 100.0)
 		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0, 0.0, 100.0)
 		var composite: float = clamp((res_demand * 0.4) + (com_demand * 0.35) + (ind_demand * 0.25), 0.0, 100.0)
+		var policy_id: String = get_district_policy(district_id)
 
 		district_demand_snapshot.append(
 			{
 				"district_id": district_id,
+				"policy_id": policy_id,
 				"demand_index": composite,
 				"res_demand": res_demand,
 				"com_demand": com_demand,
@@ -480,3 +509,27 @@ func get_district_demand_snapshot() -> Array[Dictionary]:
 	for item in district_demand_snapshot:
 		output.append(item.duplicate(true))
 	return output
+
+func set_district_policy(district_id: String, policy_id: String) -> void:
+	if district_id == "":
+		return
+	if not _is_valid_policy(policy_id):
+		return
+	district_policy_map[district_id] = policy_id
+
+func get_district_policy(district_id: String) -> String:
+	if district_policy_map.has(district_id):
+		return String(district_policy_map[district_id])
+	return POLICY_BALANCED
+
+func _is_valid_policy(policy_id: String) -> bool:
+	return policy_id in [POLICY_BALANCED, POLICY_GROWTH, POLICY_PROFIT]
+
+func _policy_growth_multiplier(policy_id: String) -> float:
+	return float(POLICY_GROWTH_MULT.get(policy_id, 1.0))
+
+func _policy_tax_multiplier(policy_id: String) -> float:
+	return float(POLICY_TAX_MULT.get(policy_id, 1.0))
+
+func _policy_upkeep_multiplier(policy_id: String) -> float:
+	return float(POLICY_UPKEEP_MULT.get(policy_id, 1.0))
