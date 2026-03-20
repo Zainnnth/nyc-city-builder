@@ -16,6 +16,9 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var pause_button: Button = $Panel/VBox/TimeControls/PauseButton
 @onready var speed_1x_button: Button = $Panel/VBox/TimeControls/Speed1xButton
 @onready var speed_3x_button: Button = $Panel/VBox/TimeControls/Speed3xButton
+@onready var preset_balanced_button: Button = $Panel/VBox/Presets/BalancedPresetButton
+@onready var preset_midtown_button: Button = $Panel/VBox/Presets/MidtownPresetButton
+@onready var preset_boroughs_button: Button = $Panel/VBox/Presets/BoroughPresetButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var econ_money: Label = $EconomyPanel/VBox/EconMoney
@@ -63,6 +66,42 @@ const POLICY_LABELS := {
 	"profit": "Profit"
 }
 
+const SCENARIOS := {
+	"balanced": {
+		"name": "Balanced Start",
+		"seed": 1998,
+		"policies": {
+			"midtown_core": "balanced",
+			"financial_district": "balanced",
+			"lower_east_side": "balanced",
+			"harlem": "balanced",
+			"queens_west": "balanced"
+		}
+	},
+	"midtown_boom": {
+		"name": "Midtown Boom",
+		"seed": 2001,
+		"policies": {
+			"midtown_core": "profit",
+			"financial_district": "profit",
+			"lower_east_side": "growth",
+			"harlem": "balanced",
+			"queens_west": "balanced"
+		}
+	},
+	"borough_buildout": {
+		"name": "Borough Buildout",
+		"seed": 1995,
+		"policies": {
+			"midtown_core": "balanced",
+			"financial_district": "balanced",
+			"lower_east_side": "growth",
+			"harlem": "growth",
+			"queens_west": "growth"
+		}
+	}
+}
+
 func _ready() -> void:
 	rng.randomize()
 	district_generator = get_node_or_null(district_generator_path)
@@ -85,6 +124,9 @@ func _ready() -> void:
 	pause_button.pressed.connect(_on_pause_toggled)
 	speed_1x_button.pressed.connect(_on_set_speed.bind(1.0))
 	speed_3x_button.pressed.connect(_on_set_speed.bind(3.0))
+	preset_balanced_button.pressed.connect(_on_apply_preset.bind("balanced"))
+	preset_midtown_button.pressed.connect(_on_apply_preset.bind("midtown_boom"))
+	preset_boroughs_button.pressed.connect(_on_apply_preset.bind("borough_buildout"))
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -458,6 +500,41 @@ func _on_set_speed(speed: float) -> void:
 	if not city_grid.has_method("set_sim_speed"):
 		return
 	city_grid.call("set_sim_speed", speed)
+	_update_time_buttons()
+
+func _on_apply_preset(preset_id: String) -> void:
+	if district_generator == null:
+		return
+	if city_grid == null:
+		return
+	if not SCENARIOS.has(preset_id):
+		status_label.text = "Preset not found."
+		return
+
+	var preset: Dictionary = SCENARIOS[preset_id]
+	var seed: int = int(preset.get("seed", 1998))
+	var scenario_name: String = String(preset.get("name", preset_id))
+	input_seed.text = str(seed)
+	district_generator.call("regenerate", seed, false)
+
+	var policies_v: Variant = preset.get("policies", {})
+	if typeof(policies_v) == TYPE_DICTIONARY and city_grid.has_method("set_district_policy"):
+		var policies: Dictionary = policies_v
+		for district_key in policies.keys():
+			var district_id: String = String(district_key)
+			var policy_id: String = String(policies[district_id])
+			city_grid.call("set_district_policy", district_id, policy_id)
+
+	if city_grid.has_method("set_sim_paused"):
+		city_grid.call("set_sim_paused", false)
+	if city_grid.has_method("set_sim_speed"):
+		city_grid.call("set_sim_speed", 1.0)
+
+	status_label.text = "Scenario loaded: %s" % scenario_name
+	_refresh_demand_bars()
+	_refresh_economy()
+	_refresh_objectives()
+	_refresh_alerts()
 	_update_time_buttons()
 
 func _update_time_buttons() -> void:
