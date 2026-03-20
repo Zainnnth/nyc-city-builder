@@ -85,6 +85,7 @@ var objectives_complete_tick := -1
 var road_cluster_count := 0
 var largest_road_cluster := 0
 var road_efficiency := 1.0
+var avg_commute_penalty := 0.0
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -246,7 +247,9 @@ func _draw_hud(map_size: Vector2) -> void:
 	var sim_text := "Connected Zones - Res: %d  Com: %d  Ind: %d" % [
 		connected_residential, connected_commercial, connected_industrial
 	]
-	sim_text += "   |   Roads: %d clusters   |   Efficiency: %.2f" % [road_cluster_count, road_efficiency]
+	sim_text += "   |   Roads: %d clusters   |   Efficiency: %.2f   |   Commute Penalty: %.2f" % [
+		road_cluster_count, road_efficiency, avg_commute_penalty
+	]
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(16, map_size.y + 64),
@@ -315,6 +318,9 @@ func _run_sim_step() -> void:
 	var road_graph: Dictionary = _build_road_graph_metrics()
 	var component_by_index: Array = road_graph.get("component_by_index", [])
 	var component_sizes: Array = road_graph.get("component_sizes", [])
+	var component_penalties: Dictionary = _build_component_commute_penalties(component_by_index, component_sizes)
+	var penalty_sum := 0.0
+	var penalty_count := 0
 	var road_count: int = int(road_graph.get("road_count", 0))
 	road_cluster_count = int(road_graph.get("component_count", 0))
 	largest_road_cluster = int(road_graph.get("largest_cluster", 0))
@@ -340,6 +346,7 @@ func _run_sim_step() -> void:
 
 			var adjacent_component: int = _adjacent_road_component(cell, component_by_index)
 			var connected := adjacent_component != -1
+			var commute_penalty: float = _component_penalty(adjacent_component, component_penalties)
 			var district_id: String = district_id_by_index[i]
 			_ensure_district_stat(district_stats, district_id)
 			var stat: Dictionary = district_stats[district_id]
@@ -356,7 +363,7 @@ func _run_sim_step() -> void:
 			var level := building_level_by_index[i]
 			var style_profile: String = style_profile_by_index[i]
 			var policy_id: String = get_district_policy(district_id)
-			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes)
+			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
 			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
@@ -377,7 +384,11 @@ func _run_sim_step() -> void:
 			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id)
 			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id)
 			stat["level_sum"] = int(stat["level_sum"]) + level
+			stat["traffic_penalty_sum"] = float(stat["traffic_penalty_sum"]) + commute_penalty
+			stat["traffic_samples"] = int(stat["traffic_samples"]) + 1
 			district_stats[district_id] = stat
+			penalty_sum += commute_penalty
+			penalty_count += 1
 
 	var target_population: int = min(pop_capacity, int(round(job_capacity * 0.9)))
 	population = int(lerp(float(population), float(target_population), 0.42))
@@ -391,6 +402,7 @@ func _run_sim_step() -> void:
 		positive_cashflow_streak += 1
 	else:
 		positive_cashflow_streak = 0
+	avg_commute_penalty = 0.0 if penalty_count == 0 else penalty_sum / float(penalty_count)
 	sim_tick += 1
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
@@ -490,6 +502,54 @@ func _road_commute_multiplier(component_id: int, component_sizes: Array) -> floa
 		return 0.75
 	return clamp(float(size) / 40.0, 0.5, 1.25)
 
+func _build_component_commute_penalties(component_by_index: Array, component_sizes: Array) -> Dictionary:
+	var component_balances := {}
+	for y in range(rows):
+		for x in range(columns):
+			var idx := _to_index(Vector2i(x, y))
+			if road_by_index[idx]:
+				continue
+			var zone := zone_by_index[idx]
+			if zone == Tool.BULLDOZE:
+				continue
+			var component_id: int = _adjacent_road_component(Vector2i(x, y), component_by_index)
+			if component_id == -1:
+				continue
+			if not component_balances.has(component_id):
+				component_balances[component_id] = {"res_load": 0.0, "job_load": 0.0}
+
+			var load_bucket: Dictionary = component_balances[component_id]
+			var level: int = max(1, building_level_by_index[idx])
+			if zone == Tool.RESIDENTIAL:
+				load_bucket["res_load"] = float(load_bucket["res_load"]) + float(level)
+			else:
+				load_bucket["job_load"] = float(load_bucket["job_load"]) + float(level)
+			component_balances[component_id] = load_bucket
+
+	var penalties: Dictionary = {}
+	for comp_key in component_balances.keys():
+		var component_id: int = int(comp_key)
+		var loads: Dictionary = component_balances[component_id]
+		var res_load: float = float(loads.get("res_load", 0.0))
+		var job_load: float = float(loads.get("job_load", 0.0))
+		var total_load: float = max(1.0, res_load + job_load)
+		var imbalance: float = abs(res_load - job_load) / total_load
+
+		var size: int = 1
+		if component_id >= 0 and component_id < component_sizes.size():
+			size = int(component_sizes[component_id])
+		var size_penalty: float = clamp(1.0 - (float(size) / 26.0), 0.0, 0.35)
+		var penalty: float = clamp(imbalance * 0.5 + size_penalty, 0.0, 0.45)
+		penalties[component_id] = penalty
+	return penalties
+
+func _component_penalty(component_id: int, penalties: Dictionary) -> float:
+	if component_id < 0:
+		return 0.3
+	if penalties.has(component_id):
+		return float(penalties[component_id])
+	return 0.0
+
 func _init_tiles() -> void:
 	zone_by_index.clear()
 	road_by_index.clear()
@@ -528,6 +588,7 @@ func reset_grid() -> void:
 	road_cluster_count = 0
 	largest_road_cluster = 0
 	road_efficiency = 1.0
+	avg_commute_penalty = 0.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_tick = 0
@@ -616,7 +677,9 @@ func _ensure_district_stat(stats: Dictionary, district_id: String) -> void:
 		"res_zones": 0,
 		"com_zones": 0,
 		"ind_zones": 0,
-		"level_sum": 0
+		"level_sum": 0,
+		"traffic_penalty_sum": 0.0,
+		"traffic_samples": 0
 	}
 
 func _update_district_demand_snapshot(stats: Dictionary) -> void:
@@ -638,11 +701,14 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 		var com_share: float = float(stat["com_zones"]) / float(total)
 		var ind_share: float = float(stat["ind_zones"]) / float(total)
 		var avg_level: float = float(stat["level_sum"]) / float(max(connected, 1))
+		var traffic_samples: int = int(stat["traffic_samples"])
+		var traffic_stress: float = 0.0 if traffic_samples == 0 else float(stat["traffic_penalty_sum"]) / float(traffic_samples)
 		var maturity_factor: float = clamp(avg_level / 3.0, 0.0, 1.0)
 
-		var res_demand: float = clamp(50.0 + (housing_pressure - 1.0) * 38.0 + (1.0 - res_share) * 10.0 + (connected_ratio - 0.5) * 14.0, 0.0, 100.0)
-		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0, 0.0, 100.0)
-		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0, 0.0, 100.0)
+		var traffic_penalty_points: float = traffic_stress * 34.0
+		var res_demand: float = clamp(50.0 + (housing_pressure - 1.0) * 38.0 + (1.0 - res_share) * 10.0 + (connected_ratio - 0.5) * 14.0 - traffic_penalty_points, 0.0, 100.0)
+		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0 - traffic_penalty_points, 0.0, 100.0)
+		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0 - traffic_penalty_points * 0.8, 0.0, 100.0)
 		var composite: float = clamp((res_demand * 0.4) + (com_demand * 0.35) + (ind_demand * 0.25), 0.0, 100.0)
 		var policy_id: String = get_district_policy(district_id)
 
@@ -651,6 +717,7 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 				"district_id": district_id,
 				"policy_id": policy_id,
 				"demand_index": composite,
+				"traffic_stress": traffic_stress,
 				"res_demand": res_demand,
 				"com_demand": com_demand,
 				"ind_demand": ind_demand
@@ -802,6 +869,7 @@ func import_state(state: Dictionary) -> bool:
 	road_cluster_count = 0
 	largest_road_cluster = 0
 	road_efficiency = 1.0
+	avg_commute_penalty = 0.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_timer = 0.0
@@ -881,6 +949,8 @@ func _update_active_alerts() -> void:
 		_push_alert("warning", "No Employment Growth", "No connected job zones.")
 	if road_cluster_count > 3 and road_efficiency < 0.55:
 		_push_alert("warning", "Fragmented Roads", "Road network is split into many clusters.")
+	if avg_commute_penalty > 0.22:
+		_push_alert("warning", "Commute Stress", "Road capacity is hurting district growth.")
 
 	if housing_pressure > 1.25:
 		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")
@@ -980,7 +1050,8 @@ func get_road_metrics() -> Dictionary:
 	return {
 		"cluster_count": road_cluster_count,
 		"largest_cluster": largest_road_cluster,
-		"efficiency": road_efficiency
+		"efficiency": road_efficiency,
+		"avg_commute_penalty": avg_commute_penalty
 	}
 
 func undo_edit() -> void:

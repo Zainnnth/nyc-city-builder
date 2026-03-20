@@ -50,6 +50,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Milestone banner appears when all objectives are complete.
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
+  - Shows traffic stress signal per district.
   - Updates continuously from simulation telemetry.
   - `Focus District` jumps camera to that neighborhood cluster.
   - Opens district detail popup with demand breakdown.

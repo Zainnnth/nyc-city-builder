@@ -240,6 +240,7 @@ func _refresh_demand_bars() -> void:
 		var display_name: String = String(DISTRICT_NAMES.get(district_id, district_id))
 		var demand: float = float(row_data.get("demand_index", 0.0))
 		var policy_id: String = String(row_data.get("policy_id", "balanced"))
+		var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -258,8 +259,8 @@ func _refresh_demand_bars() -> void:
 
 		var sub: Label = Label.new()
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
-		sub.text = "R %d  C %d  I %d  |  %s" % [
-			res_d, com_d, ind_d, String(POLICY_LABELS.get(policy_id, "Balanced"))
+		sub.text = "R %d  C %d  I %d  |  T %.2f  |  %s" % [
+			res_d, com_d, ind_d, traffic_stress, String(POLICY_LABELS.get(policy_id, "Balanced"))
 		]
 		row.add_child(sub)
 
@@ -289,11 +290,12 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 	var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 	var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
+	var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
 	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name
-	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d" % [
-		demand, res_d, com_d, ind_d
+	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f" % [
+		demand, res_d, com_d, ind_d, traffic_stress
 	]
 	popup_policy.text = "Policy: %s" % String(POLICY_LABELS.get(policy_id, "Balanced"))
 	popup_panel.visible = true
