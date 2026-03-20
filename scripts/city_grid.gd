@@ -73,6 +73,7 @@ var district_policy_map: Dictionary = {}
 var economy_history: Array[Dictionary] = []
 var sim_tick := 0
 const MAX_HISTORY := 90
+var active_alerts: Array[Dictionary] = []
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -343,6 +344,7 @@ func _run_sim_step() -> void:
 	sim_tick += 1
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
+	_update_active_alerts()
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
 	var neighbors := [
@@ -389,6 +391,7 @@ func reset_grid() -> void:
 	district_demand_snapshot.clear()
 	district_policy_map.clear()
 	economy_history.clear()
+	active_alerts.clear()
 	sim_tick = 0
 	sim_timer = 0.0
 	sim_speed = 1.0
@@ -711,3 +714,47 @@ func get_economy_snapshot() -> Dictionary:
 		"job_pressure": job_pressure,
 		"sim_tick": sim_tick
 	}
+
+func _update_active_alerts() -> void:
+	active_alerts.clear()
+
+	var housing_pressure: float = clamp((float(jobs) + 1.0) / (float(population) + 1.0), 0.5, 2.0)
+	var job_pressure: float = clamp((float(population) + 1.0) / (float(jobs) + 1.0), 0.5, 2.0)
+
+	if money < 0:
+		_push_alert("critical", "Budget Deficit", "City treasury is negative.")
+	elif money < 1200:
+		_push_alert("warning", "Low Treasury", "Cash reserves are running low.")
+
+	if connected_residential == 0:
+		_push_alert("warning", "No Housing Growth", "No connected residential zones.")
+	if connected_commercial + connected_industrial == 0:
+		_push_alert("warning", "No Employment Growth", "No connected job zones.")
+
+	if housing_pressure > 1.25:
+		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")
+	elif housing_pressure < 0.8:
+		_push_alert("info", "Housing Surplus", "Residential growth is outpacing jobs.")
+
+	if job_pressure > 1.25:
+		_push_alert("warning", "Job Pressure", "Population is outpacing jobs.")
+	elif job_pressure < 0.8:
+		_push_alert("info", "Job Surplus", "Jobs are outpacing population.")
+
+	if active_alerts.is_empty():
+		_push_alert("ok", "Stable", "No major systemic pressure detected.")
+
+func _push_alert(level: String, title: String, detail: String) -> void:
+	active_alerts.append(
+		{
+			"level": level,
+			"title": title,
+			"detail": detail
+		}
+	)
+
+func get_active_alerts() -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	for alert in active_alerts:
+		output.append(alert.duplicate(true))
+	return output

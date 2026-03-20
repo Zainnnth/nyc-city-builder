@@ -22,6 +22,7 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
 @onready var econ_pressure: Label = $EconomyPanel/VBox/EconPressure
+@onready var alert_rows: VBoxContainer = $AlertsPanel/VBox/AlertRows
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
 @onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
@@ -93,6 +94,7 @@ func _process(delta: float) -> void:
 		ui_timer = 0.0
 		_refresh_demand_bars()
 		_refresh_economy()
+		_refresh_alerts()
 		_update_time_buttons()
 	if autosave_toggle.button_pressed:
 		autosave_timer += delta
@@ -341,6 +343,42 @@ func _refresh_economy() -> void:
 	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
 	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f" % [housing_p, job_p]
+
+func _refresh_alerts() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_active_alerts"):
+		return
+
+	var alerts_v: Variant = city_grid.call("get_active_alerts")
+	if typeof(alerts_v) != TYPE_ARRAY:
+		return
+	var alerts: Array = alerts_v
+
+	for child in alert_rows.get_children():
+		child.queue_free()
+
+	for alert_v in alerts:
+		if typeof(alert_v) != TYPE_DICTIONARY:
+			continue
+		var alert: Dictionary = alert_v
+		var level: String = String(alert.get("level", "info"))
+		var title: String = String(alert.get("title", "Alert"))
+		var detail: String = String(alert.get("detail", ""))
+
+		var label: Label = Label.new()
+		label.text = "%s: %s" % [title, detail]
+		label.modulate = _alert_color(level)
+		alert_rows.add_child(label)
+
+func _alert_color(level: String) -> Color:
+	if level == "critical":
+		return Color(0.96, 0.42, 0.37, 0.98)
+	if level == "warning":
+		return Color(0.95, 0.76, 0.31, 0.98)
+	if level == "ok":
+		return Color(0.55, 0.86, 0.62, 0.98)
+	return Color(0.74, 0.81, 0.92, 0.98)
 
 func _on_pause_toggled() -> void:
 	if city_grid == null:

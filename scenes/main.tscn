@@ -146,6 +146,22 @@ text = "Jobs: 0 (+0)"
 layout_mode = 2
 text = "Housing P: 1.00  |  Job P: 1.00"
 
+[node name="AlertsPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 398.0
+offset_top = 370.0
+offset_right = 664.0
+offset_bottom = 560.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/AlertsPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/AlertsPanel/VBox"]
+layout_mode = 2
+text = "City Alerts"
+
+[node name="AlertRows" type="VBoxContainer" parent="SeedPanel/AlertsPanel/VBox"]
+layout_mode = 2
+
 [node name="DistrictPopup" type="PanelContainer" parent="SeedPanel"]
 offset_left = 398.0
 offset_top = 14.0
