@@ -5,12 +5,14 @@ extends Node2D
 @export var fallback_geojson_path := "res://data/raw/sample_buildings.geojson"
 @export var district_config_path := "res://tools/pipeline/config/district_profiles.json"
 @export var style_profile_path := "res://data/runtime/style_profiles.json"
+@export var district_identity_path := "res://data/runtime/district_identity.json"
 @export var world_seed := 1998
 
 var city_grid: Node2D
 var overlay_visible := true
 var overlay_blocks: Array[Dictionary] = []
 var style_profiles: Dictionary = {}
+var district_identity_profiles: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var district_focus_points: Dictionary = {}
 const DEFAULT_SAVE_PATH := "user://savegame.json"
@@ -32,6 +34,8 @@ func _ready() -> void:
 		push_warning("DistrictGenerator: CityGrid not found at path: %s" % city_grid_path)
 		return
 	style_profiles = _load_style_profiles()
+	district_identity_profiles = _load_district_identity_profiles()
+	_apply_identity_profiles_to_city_grid()
 	regenerate(world_seed, true)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -252,6 +256,19 @@ func _load_style_profiles() -> Dictionary:
 	var profiles: Dictionary = payload.get("profiles", {})
 	return profiles
 
+func _load_district_identity_profiles() -> Dictionary:
+	var payload: Dictionary = _load_geojson(district_identity_path)
+	if payload.is_empty():
+		return {}
+	return payload.duplicate(true)
+
+func _apply_identity_profiles_to_city_grid() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_district_identity_profiles"):
+		return
+	city_grid.call("set_district_identity_profiles", district_identity_profiles)
+
 func _key(cell: Vector2i) -> String:
 	return "%d:%d" % [cell.x, cell.y]
 
@@ -316,6 +333,7 @@ func regenerate(new_seed: int = -1, initial_load: bool = false) -> void:
 
 	if city_grid.has_method("apply_district_seed"):
 		city_grid.call("apply_district_seed", seeded)
+	_apply_identity_profiles_to_city_grid()
 	_build_overlay(seeded)
 	queue_redraw()
 

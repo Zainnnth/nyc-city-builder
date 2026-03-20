@@ -93,6 +93,7 @@ var avg_land_value := 0.0
 var avg_noise := 0.0
 var avg_crime := 0.0
 var district_upkeep_hook_map: Dictionary = {}
+var district_identity_profiles: Dictionary = {}
 var service_levels := {
 	"police": 55.0,
 	"fire": 55.0,
@@ -259,7 +260,9 @@ func _draw_tile(rect: Rect2, index: int) -> void:
 	if building_level > 0:
 		var margin := 18.0 - float(building_level * 3)
 		margin = clamp(margin, 6.0, 16.0)
-		draw_rect(rect.grow(-margin), _building_color_for(index), true)
+		var building_rect := rect.grow(-margin)
+		draw_rect(building_rect, _building_color_for(index), true)
+		_draw_signage_lights(building_rect, index, building_level)
 
 	_draw_overlay(rect, index)
 
@@ -287,12 +290,45 @@ func _building_color_for(index: int) -> Color:
 	var district_id: String = district_id_by_index[index]
 	var district_tint: Color = DISTRICT_TINTS.get(district_id, DISTRICT_TINTS["outer_borough_mix"])
 	var style_profile: String = style_profile_by_index[index]
+	var identity_profile: Dictionary = _identity_profile_for(district_id)
+	var accent: Color = _identity_color(identity_profile, "accent_color", district_tint)
+	var tint_mix: float = clamp(_identity_signage_density(identity_profile) * 0.28, 0.05, 0.3)
+	var base: Color = district_tint.lerp(accent, tint_mix)
 
 	if style_profile.find("industrial") != -1:
-		return district_tint.darkened(0.2)
+		return base.darkened(0.2)
 	if style_profile.find("brownstone") != -1:
-		return district_tint.darkened(0.1)
-	return district_tint
+		return base.darkened(0.1)
+	return base
+
+func _draw_signage_lights(building_rect: Rect2, index: int, building_level: int) -> void:
+	var district_id: String = district_id_by_index[index]
+	var identity_profile: Dictionary = _identity_profile_for(district_id)
+	var density: float = _identity_signage_density(identity_profile)
+	if density <= 0.01:
+		return
+	if building_level < 2:
+		return
+
+	var light_color: Color = _identity_color(identity_profile, "night_accent_color", Color(0.78, 0.83, 0.92, 0.9))
+	var stripe_count: int = clampi(building_level + 1, 2, 4)
+	for stripe in range(stripe_count):
+		var roll: float = _tile_noise01(index, stripe + 17)
+		if roll > density:
+			continue
+		var y_t: float = 0.2 + 0.22 * float(stripe)
+		var stripe_h: float = clamp(building_rect.size.y * 0.08, 2.0, 4.5)
+		var inset: float = clamp(building_rect.size.x * 0.14, 2.0, 7.0)
+		var stripe_rect: Rect2 = Rect2(
+			Vector2(building_rect.position.x + inset, building_rect.position.y + building_rect.size.y * y_t),
+			Vector2(max(3.0, building_rect.size.x - inset * 2.0), stripe_h)
+		)
+		draw_rect(stripe_rect, light_color, true)
+
+func _tile_noise01(index: int, salt: int) -> float:
+	var h: int = int(hash("%d:%d" % [index, salt]))
+	var mod_val: int = abs(h) % 1000
+	return float(mod_val) / 1000.0
 
 func _draw_hud(map_size: Vector2) -> void:
 	var text := "Tool: %s   |   Money: $%d   |   Pop: %d   |   Jobs: %d" % [
@@ -459,9 +495,13 @@ func _run_sim_step() -> void:
 			var level := building_level_by_index[i]
 			var style_profile: String = style_profile_by_index[i]
 			var policy_id: String = get_district_policy(district_id)
+			var identity_profile: Dictionary = _identity_profile_for(district_id)
+			var identity_growth_mult: float = _identity_growth_multiplier(zone, identity_profile)
+			var identity_tax_mult: float = _identity_tax_multiplier(zone, identity_profile)
+			var identity_noise_mult: float = _identity_noise_penalty_multiplier(identity_profile)
 			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
 			var zone_service_mult: float = _zone_service_multiplier(zone)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id)
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id) * identity_growth_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -480,7 +520,7 @@ func _run_sim_step() -> void:
 			var tile_output := (float(level) * 4.0) + 3.0
 			var district_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
 			var live_upkeep_hook: float = clamp(1.0 + commute_penalty * 0.35 + (1.0 - zone_service_mult) * 0.28, 0.85, 1.7)
-			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id)
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id) * identity_tax_mult
 			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id)
 			service_upkeep_cost += _zone_service_cost(zone)
 			stat["level_sum"] = int(stat["level_sum"]) + level
@@ -516,7 +556,7 @@ func _run_sim_step() -> void:
 				0.0, 100.0
 			)
 			noise_by_index[i] = clamp(
-				noise_base + commute_penalty * 26.0 + (1.0 - sanitation_norm) * 12.0 + (1.0 - transit_norm) * 6.0 + _event_noise_bonus(district_id),
+				(noise_base + commute_penalty * 26.0 + (1.0 - sanitation_norm) * 12.0 + (1.0 - transit_norm) * 6.0 + _event_noise_bonus(district_id)) * identity_noise_mult,
 				0.0, 100.0
 			)
 			crime_by_index[i] = clamp(
@@ -955,6 +995,50 @@ func get_overlay_metrics() -> Dictionary:
 		"avg_commute_penalty": avg_commute_penalty
 	}
 
+func set_district_identity_profiles(payload: Dictionary) -> void:
+	district_identity_profiles = payload.duplicate(true)
+
+func get_district_identity(district_id: String) -> Dictionary:
+	return _identity_profile_for(district_id).duplicate(true)
+
+func _identity_profile_for(district_id: String) -> Dictionary:
+	if district_identity_profiles.is_empty():
+		return {}
+	var districts_v: Variant = district_identity_profiles.get("districts", {})
+	if typeof(districts_v) != TYPE_DICTIONARY:
+		return {}
+	var districts: Dictionary = districts_v
+	if districts.has(district_id):
+		return Dictionary(districts[district_id])
+	var fallback_v: Variant = district_identity_profiles.get("fallback", {})
+	if typeof(fallback_v) == TYPE_DICTIONARY:
+		return Dictionary(fallback_v)
+	return {}
+
+func _identity_color(profile: Dictionary, key: String, fallback: Color) -> Color:
+	var color_value: Variant = profile.get(key, "")
+	if typeof(color_value) == TYPE_STRING:
+		var color_text: String = String(color_value)
+		if color_text != "":
+			return Color.from_string(color_text, fallback)
+	return fallback
+
+func _identity_signage_density(profile: Dictionary) -> float:
+	return clamp(float(profile.get("signage_density", 0.0)), 0.0, 1.0)
+
+func _identity_growth_multiplier(zone: int, profile: Dictionary) -> float:
+	if zone == Tool.COMMERCIAL:
+		return clamp(float(profile.get("commercial_growth_mult", 1.0)), 0.85, 1.25)
+	return 1.0
+
+func _identity_tax_multiplier(zone: int, profile: Dictionary) -> float:
+	if zone == Tool.COMMERCIAL:
+		return clamp(float(profile.get("commercial_tax_mult", 1.0)), 0.85, 1.3)
+	return 1.0
+
+func _identity_noise_penalty_multiplier(profile: Dictionary) -> float:
+	return clamp(float(profile.get("noise_penalty_mult", 1.0)), 0.8, 1.25)
+
 func _service_norm(service_id: String) -> float:
 	return clamp(float(service_levels.get(service_id, 0.0)) / 100.0, 0.0, 1.0)
 
@@ -1161,6 +1245,7 @@ func export_state() -> Dictionary:
 		"crime_by_index": crime_by_index.duplicate(),
 		"district_policy_map": district_policy_map.duplicate(true),
 		"district_upkeep_hook_map": district_upkeep_hook_map.duplicate(true),
+		"district_identity_profiles": district_identity_profiles.duplicate(true),
 		"service_levels": service_levels.duplicate(true),
 		"overlay_mode": overlay_mode,
 		"active_event_id": active_event_id,
@@ -1193,6 +1278,7 @@ func import_state(state: Dictionary) -> bool:
 	var crime_v: Variant = state.get("crime_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
 	var upkeep_hooks_v: Variant = state.get("district_upkeep_hook_map", {})
+	var identity_profiles_v: Variant = state.get("district_identity_profiles", {})
 	var services_v: Variant = state.get("service_levels", {})
 	var recent_events_v: Variant = state.get("recent_events", [])
 	var history_v: Variant = state.get("economy_history", [])
@@ -1216,6 +1302,8 @@ func import_state(state: Dictionary) -> bool:
 	if typeof(policies_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(upkeep_hooks_v) != TYPE_DICTIONARY:
+		return false
+	if typeof(identity_profiles_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
 		return false
@@ -1271,6 +1359,7 @@ func import_state(state: Dictionary) -> bool:
 
 	district_policy_map = Dictionary(policies_v).duplicate(true)
 	district_upkeep_hook_map = Dictionary(upkeep_hooks_v).duplicate(true)
+	district_identity_profiles = Dictionary(identity_profiles_v).duplicate(true)
 	var service_dict: Dictionary = Dictionary(services_v)
 	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)

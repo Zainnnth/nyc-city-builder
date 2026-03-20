@@ -50,6 +50,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Overlay controls:
     - `None`, `Land Value`, `Noise`, `Crime`
     - Includes live average overlay metrics
+  - District identity pass (v1):
+    - `midtown_core` now uses higher signage density and accent tinting
+    - District archetype tags appear in demand rows/popup
+    - Identity profile values can tune commercial growth/tax/noise behavior
   - District event controls:
     - Auto-spawned events by district (`Blackout`, `Transit Strike`, `Heatwave`)
     - Manual `Trigger Event` button for balancing tests
@@ -62,6 +66,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Shows per-district demand index and `R/C/I` demand values.
   - Shows traffic stress, service stress, and district upkeep hook.
   - Shows currently active district event (if any).
+  - Shows district identity/archetype hint.
   - Updates continuously from simulation telemetry.
   - `Focus District` jumps camera to that neighborhood cluster.
   - Opens district detail popup with demand breakdown.

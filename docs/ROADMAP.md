@@ -34,6 +34,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 
 ## Phase 3 - NYC Flavor Pass
 
+- [x] Midtown identity content pack v1 (accent/signage/archetype flavor)
 - [ ] District identity content packs (Midtown, LES, Harlem, FiDi, Queens West)
 - [ ] Style-linked building archetypes and signage density
 - [ ] Atmosphere pass: haze, sodium lights, retro UI accents

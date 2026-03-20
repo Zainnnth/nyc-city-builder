@@ -1,0 +1,83 @@
+{
+  "districts": {
+    "midtown_core": {
+      "display_name": "Midtown Core",
+      "accent_color": "#E89A2E",
+      "night_accent_color": "#3CA8A6",
+      "signage_density": 0.78,
+      "commercial_growth_mult": 1.08,
+      "commercial_tax_mult": 1.07,
+      "noise_penalty_mult": 1.06,
+      "archetypes": [
+        "glass_tower_lobby",
+        "theater_marquee_strip",
+        "taxi_rank_corner",
+        "newsstand_cluster"
+      ]
+    },
+    "financial_district": {
+      "display_name": "Financial District",
+      "accent_color": "#B25C3B",
+      "night_accent_color": "#C7CEDC",
+      "signage_density": 0.28,
+      "commercial_growth_mult": 1.03,
+      "commercial_tax_mult": 1.1,
+      "noise_penalty_mult": 0.96,
+      "archetypes": [
+        "stone_tower_plaza",
+        "late_train_commuter_node"
+      ]
+    },
+    "lower_east_side": {
+      "display_name": "Lower East Side",
+      "accent_color": "#4A3A56",
+      "night_accent_color": "#E89A2E",
+      "signage_density": 0.52,
+      "commercial_growth_mult": 1.02,
+      "commercial_tax_mult": 1.0,
+      "noise_penalty_mult": 1.02,
+      "archetypes": [
+        "walkup_bodega_strip",
+        "venue_block_mix"
+      ]
+    },
+    "harlem": {
+      "display_name": "Harlem",
+      "accent_color": "#3CA8A6",
+      "night_accent_color": "#E89A2E",
+      "signage_density": 0.38,
+      "commercial_growth_mult": 1.01,
+      "commercial_tax_mult": 0.98,
+      "noise_penalty_mult": 1.0,
+      "archetypes": [
+        "brownstone_music_corridor",
+        "community_market_node"
+      ]
+    },
+    "queens_west": {
+      "display_name": "Queens West",
+      "accent_color": "#2C3C5F",
+      "night_accent_color": "#3CA8A6",
+      "signage_density": 0.32,
+      "commercial_growth_mult": 1.0,
+      "commercial_tax_mult": 0.99,
+      "noise_penalty_mult": 0.98,
+      "archetypes": [
+        "warehouse_conversion_row",
+        "waterfront_midrise_mix"
+      ]
+    }
+  },
+  "fallback": {
+    "display_name": "Outer Mix",
+    "accent_color": "#C7CEDC",
+    "night_accent_color": "#3CA8A6",
+    "signage_density": 0.24,
+    "commercial_growth_mult": 1.0,
+    "commercial_tax_mult": 1.0,
+    "noise_penalty_mult": 1.0,
+    "archetypes": [
+      "mixed_block_generic"
+    ]
+  }
+}

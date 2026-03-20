@@ -270,6 +270,7 @@ func _refresh_demand_bars() -> void:
 		var service_stress: float = float(row_data.get("service_stress", 0.0))
 		var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
 		var active_event: String = String(row_data.get("active_event", "None"))
+		var identity_tag: String = _district_identity_tag(district_id)
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -288,8 +289,8 @@ func _refresh_demand_bars() -> void:
 
 		var sub: Label = Label.new()
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
-		sub.text = "R %d  C %d  I %d  |  T %.2f  S %.2f  U %.2f  |  %s  |  %s" % [
-			res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, String(POLICY_LABELS.get(policy_id, "Balanced")), active_event
+		sub.text = "R %d  C %d  I %d  |  T %.2f  S %.2f  U %.2f  |  %s  |  %s  |  %s" % [
+			res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, String(POLICY_LABELS.get(policy_id, "Balanced")), active_event, identity_tag
 		]
 		row.add_child(sub)
 
@@ -323,11 +324,12 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var service_stress: float = float(row_data.get("service_stress", 0.0))
 	var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
 	var active_event: String = String(row_data.get("active_event", "None"))
+	var identity_tag: String = _district_identity_tag(district_id)
 	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name
-	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f\nService Stress %.2f\nUpkeep Hook %.2f\nActive Event %s" % [
-		demand, res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, active_event
+	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f\nService Stress %.2f\nUpkeep Hook %.2f\nActive Event %s\nIdentity %s" % [
+		demand, res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, active_event, identity_tag
 	]
 	popup_policy.text = "Policy: %s" % String(POLICY_LABELS.get(policy_id, "Balanced"))
 	popup_panel.visible = true
@@ -571,6 +573,23 @@ func _refresh_event_panel() -> void:
 		String(DISTRICT_NAMES.get(latest_district, latest_district)),
 		latest_state
 	]
+
+func _district_identity_tag(district_id: String) -> String:
+	if city_grid == null:
+		return "Identity n/a"
+	if not city_grid.has_method("get_district_identity"):
+		return "Identity n/a"
+	var id_v: Variant = city_grid.call("get_district_identity", district_id)
+	if typeof(id_v) != TYPE_DICTIONARY:
+		return "Identity n/a"
+	var identity: Dictionary = id_v
+	var archetypes_v: Variant = identity.get("archetypes", [])
+	if typeof(archetypes_v) != TYPE_ARRAY:
+		return "Identity n/a"
+	var archetypes: Array = archetypes_v
+	if archetypes.is_empty():
+		return "Identity n/a"
+	return String(archetypes[0]).replace("_", " ")
 
 func _refresh_objectives() -> void:
 	if city_grid == null:
