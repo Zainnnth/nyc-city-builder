@@ -58,6 +58,7 @@ var road_by_index: Array[bool] = []
 var building_level_by_index: Array[int] = []
 var district_id_by_index: Array[String] = []
 var style_profile_by_index: Array[String] = []
+var archetype_by_index: Array[String] = []
 var land_value_by_index: Array[float] = []
 var noise_by_index: Array[float] = []
 var crime_by_index: Array[float] = []
@@ -305,13 +306,18 @@ func _draw_signage_lights(building_rect: Rect2, index: int, building_level: int)
 	var district_id: String = district_id_by_index[index]
 	var identity_profile: Dictionary = _identity_profile_for(district_id)
 	var density: float = _identity_signage_density(identity_profile)
+	var archetype: String = archetype_by_index[index]
+	var archetype_mod: Dictionary = _archetype_signage_mod(archetype)
+	density *= float(archetype_mod.get("density_mult", 1.0))
 	if density <= 0.01:
 		return
 	if building_level < 2:
 		return
 
 	var light_color: Color = _identity_color(identity_profile, "night_accent_color", Color(0.78, 0.83, 0.92, 0.9))
-	var stripe_count: int = clampi(building_level + 1, 2, 4)
+	var color_shift: float = float(archetype_mod.get("color_shift", 0.0))
+	light_color = light_color.lightened(max(color_shift, 0.0)).darkened(max(-color_shift, 0.0))
+	var stripe_count: int = clampi(building_level + int(archetype_mod.get("stripe_bonus", 0)), 2, 5)
 	for stripe in range(stripe_count):
 		var roll: float = _tile_noise01(index, stripe + 17)
 		if roll > density:
@@ -329,6 +335,20 @@ func _tile_noise01(index: int, salt: int) -> float:
 	var h: int = int(hash("%d:%d" % [index, salt]))
 	var mod_val: int = abs(h) % 1000
 	return float(mod_val) / 1000.0
+
+func _archetype_signage_mod(archetype: String) -> Dictionary:
+	var name: String = archetype.to_lower()
+	if name.find("marquee") != -1:
+		return {"density_mult": 1.35, "stripe_bonus": 1, "color_shift": 0.18}
+	if name.find("bodega") != -1:
+		return {"density_mult": 1.22, "stripe_bonus": 0, "color_shift": 0.1}
+	if name.find("glass_tower") != -1:
+		return {"density_mult": 1.12, "stripe_bonus": 1, "color_shift": 0.04}
+	if name.find("stone_tower") != -1:
+		return {"density_mult": 0.68, "stripe_bonus": -1, "color_shift": -0.08}
+	if name.find("warehouse") != -1:
+		return {"density_mult": 0.56, "stripe_bonus": -1, "color_shift": -0.12}
+	return {"density_mult": 1.0, "stripe_bonus": 0, "color_shift": 0.0}
 
 func _draw_hud(map_size: Vector2) -> void:
 	var text := "Tool: %s   |   Money: $%d   |   Pop: %d   |   Jobs: %d" % [
@@ -394,6 +414,7 @@ func _paint_at_mouse_position() -> void:
 				road_by_index[index] = true
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
+				archetype_by_index[index] = "road_segment"
 				money -= 8
 				stroke_dirty = true
 		Tool.BULLDOZE:
@@ -402,6 +423,7 @@ func _paint_at_mouse_position() -> void:
 				road_by_index[index] = false
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
+				archetype_by_index[index] = "vacant_lot"
 				money -= 3
 				stroke_dirty = true
 		_:
@@ -410,6 +432,7 @@ func _paint_at_mouse_position() -> void:
 				road_by_index[index] = false
 				zone_by_index[index] = selected_tool
 				building_level_by_index[index] = 0
+				archetype_by_index[index] = _default_archetype_for_cell(index, selected_tool)
 				money -= 5
 				stroke_dirty = true
 
@@ -530,6 +553,11 @@ func _run_sim_step() -> void:
 			stat["service_samples"] = int(stat["service_samples"]) + 1
 			stat["upkeep_load_sum"] = float(stat["upkeep_load_sum"]) + live_upkeep_hook
 			stat["upkeep_samples"] = int(stat["upkeep_samples"]) + 1
+			var archetype: String = archetype_by_index[i]
+			var counts_v: Variant = stat.get("archetype_counts", {})
+			var counts: Dictionary = counts_v if typeof(counts_v) == TYPE_DICTIONARY else {}
+			counts[archetype] = int(counts.get(archetype, 0)) + 1
+			stat["archetype_counts"] = counts
 			district_stats[district_id] = stat
 			penalty_sum += commute_penalty
 			penalty_count += 1
@@ -739,6 +767,7 @@ func _init_tiles() -> void:
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	archetype_by_index.clear()
 	land_value_by_index.clear()
 	noise_by_index.clear()
 	crime_by_index.clear()
@@ -749,6 +778,7 @@ func _init_tiles() -> void:
 		building_level_by_index.append(0)
 		district_id_by_index.append("outer_borough_mix")
 		style_profile_by_index.append("default_mixed")
+		archetype_by_index.append("mixed_block_generic")
 		land_value_by_index.append(30.0)
 		noise_by_index.append(10.0)
 		crime_by_index.append(10.0)
@@ -812,10 +842,12 @@ func apply_district_seed(seed_records: Array[Dictionary]) -> void:
 		var zone := _zone_from_seed(record)
 		var district_id: String = String(record.get("district_id", "outer_borough_mix"))
 		var style_profile: String = String(record.get("style_profile", "default_mixed"))
+		var archetype: String = String(record.get("archetype", _default_archetype_for_district(district_id)))
 		zone_by_index[index] = zone
 		building_level_by_index[index] = clampi(int(record.get("seed_level", 1)), 1, 3)
 		district_id_by_index[index] = district_id
 		style_profile_by_index[index] = style_profile
+		archetype_by_index[index] = archetype
 		if not district_policy_map.has(district_id):
 			district_policy_map[district_id] = POLICY_BALANCED
 		_ensure_adjacent_road(cell)
@@ -851,6 +883,7 @@ func _ensure_adjacent_road(cell: Vector2i) -> void:
 			road_by_index[idx] = true
 			district_id_by_index[idx] = district_id_by_index[_to_index(cell)]
 			style_profile_by_index[idx] = style_profile_by_index[_to_index(cell)]
+			archetype_by_index[idx] = "road_segment"
 			building_level_by_index[idx] = 0
 			return
 
@@ -885,7 +918,8 @@ func _ensure_district_stat(stats: Dictionary, district_id: String) -> void:
 		"service_penalty_sum": 0.0,
 		"service_samples": 0,
 		"upkeep_load_sum": 0.0,
-		"upkeep_samples": 0
+		"upkeep_samples": 0,
+		"archetype_counts": {}
 	}
 
 func _update_district_demand_snapshot(stats: Dictionary) -> void:
@@ -912,6 +946,8 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 		var service_samples: int = int(stat["service_samples"])
 		var service_stress: float = 0.0 if service_samples == 0 else float(stat["service_penalty_sum"]) / float(service_samples)
 		var upkeep_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
+		var archetype_counts: Dictionary = Dictionary(stat.get("archetype_counts", {}))
+		var primary_archetype: String = _primary_archetype(archetype_counts, district_id)
 		var maturity_factor: float = clamp(avg_level / 3.0, 0.0, 1.0)
 
 		var traffic_penalty_points: float = traffic_stress * 34.0
@@ -931,6 +967,7 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 				"service_stress": service_stress,
 				"upkeep_hook": upkeep_hook,
 				"active_event": _event_label_for_district(district_id),
+				"primary_archetype": primary_archetype,
 				"res_demand": res_demand,
 				"com_demand": com_demand,
 				"ind_demand": ind_demand
@@ -1038,6 +1075,25 @@ func _identity_tax_multiplier(zone: int, profile: Dictionary) -> float:
 
 func _identity_noise_penalty_multiplier(profile: Dictionary) -> float:
 	return clamp(float(profile.get("noise_penalty_mult", 1.0)), 0.8, 1.25)
+
+func _default_archetype_for_district(district_id: String) -> String:
+	var profile: Dictionary = _identity_profile_for(district_id)
+	var archetypes_v: Variant = profile.get("archetypes", [])
+	if typeof(archetypes_v) == TYPE_ARRAY:
+		var archetypes: Array = archetypes_v
+		if not archetypes.is_empty():
+			return String(archetypes[0])
+	return "mixed_block_generic"
+
+func _default_archetype_for_cell(index: int, zone: int) -> String:
+	var district_id: String = district_id_by_index[index]
+	if zone == Tool.INDUSTRIAL:
+		return "warehouse_conversion_row"
+	if zone == Tool.COMMERCIAL:
+		return _default_archetype_for_district(district_id)
+	if zone == Tool.RESIDENTIAL:
+		return "walkup_residential_row"
+	return "mixed_block_generic"
 
 func _service_norm(service_id: String) -> float:
 	return clamp(float(service_levels.get(service_id, 0.0)) / 100.0, 0.0, 1.0)
@@ -1203,6 +1259,19 @@ func _average_upkeep_hook() -> float:
 		sum += float(district_upkeep_hook_map[key])
 	return sum / float(max(district_upkeep_hook_map.size(), 1))
 
+func _primary_archetype(counts: Dictionary, district_id: String) -> String:
+	var best_name := ""
+	var best_count := -1
+	for key in counts.keys():
+		var name: String = String(key)
+		var count: int = int(counts[key])
+		if count > best_count:
+			best_name = name
+			best_count = count
+	if best_name != "":
+		return best_name
+	return _default_archetype_for_district(district_id)
+
 func get_event_snapshot() -> Dictionary:
 	return {
 		"active_event_id": active_event_id,
@@ -1240,6 +1309,7 @@ func export_state() -> Dictionary:
 		"building_level_by_index": building_level_by_index.duplicate(),
 		"district_id_by_index": district_id_by_index.duplicate(),
 		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"archetype_by_index": archetype_by_index.duplicate(),
 		"land_value_by_index": land_value_by_index.duplicate(),
 		"noise_by_index": noise_by_index.duplicate(),
 		"crime_by_index": crime_by_index.duplicate(),
@@ -1273,12 +1343,13 @@ func import_state(state: Dictionary) -> bool:
 	var levels_v: Variant = state.get("building_level_by_index", [])
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
+	var archetypes_v: Variant = state.get("archetype_by_index", null)
 	var land_v: Variant = state.get("land_value_by_index", [])
 	var noise_v: Variant = state.get("noise_by_index", [])
 	var crime_v: Variant = state.get("crime_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
 	var upkeep_hooks_v: Variant = state.get("district_upkeep_hook_map", {})
-	var identity_profiles_v: Variant = state.get("district_identity_profiles", {})
+	var identity_profiles_v: Variant = state.get("district_identity_profiles", null)
 	var services_v: Variant = state.get("service_levels", {})
 	var recent_events_v: Variant = state.get("recent_events", [])
 	var history_v: Variant = state.get("economy_history", [])
@@ -1303,8 +1374,6 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if typeof(upkeep_hooks_v) != TYPE_DICTIONARY:
 		return false
-	if typeof(identity_profiles_v) != TYPE_DICTIONARY:
-		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(recent_events_v) != TYPE_ARRAY:
@@ -1318,6 +1387,9 @@ func import_state(state: Dictionary) -> bool:
 	var levels: Array = levels_v
 	var districts: Array = districts_v
 	var styles: Array = styles_v
+	var archetypes: Array = []
+	if typeof(archetypes_v) == TYPE_ARRAY:
+		archetypes = archetypes_v
 	var land_values: Array = land_v
 	var noise_values: Array = noise_v
 	var crime_values: Array = crime_v
@@ -1331,6 +1403,8 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if styles.size() != expected_size:
 		return false
+	if not archetypes.is_empty() and archetypes.size() != expected_size:
+		return false
 	if land_values.size() != expected_size:
 		return false
 	if noise_values.size() != expected_size:
@@ -1343,6 +1417,7 @@ func import_state(state: Dictionary) -> bool:
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	archetype_by_index.clear()
 	land_value_by_index.clear()
 	noise_by_index.clear()
 	crime_by_index.clear()
@@ -1353,13 +1428,18 @@ func import_state(state: Dictionary) -> bool:
 		building_level_by_index.append(int(levels[i]))
 		district_id_by_index.append(String(districts[i]))
 		style_profile_by_index.append(String(styles[i]))
+		if archetypes.is_empty():
+			archetype_by_index.append(_default_archetype_for_district(String(districts[i])))
+		else:
+			archetype_by_index.append(String(archetypes[i]))
 		land_value_by_index.append(float(land_values[i]))
 		noise_by_index.append(float(noise_values[i]))
 		crime_by_index.append(float(crime_values[i]))
 
 	district_policy_map = Dictionary(policies_v).duplicate(true)
 	district_upkeep_hook_map = Dictionary(upkeep_hooks_v).duplicate(true)
-	district_identity_profiles = Dictionary(identity_profiles_v).duplicate(true)
+	if typeof(identity_profiles_v) == TYPE_DICTIONARY:
+		district_identity_profiles = Dictionary(identity_profiles_v).duplicate(true)
 	var service_dict: Dictionary = Dictionary(services_v)
 	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
@@ -1673,6 +1753,7 @@ func _capture_edit_state() -> Dictionary:
 		"building_level_by_index": building_level_by_index.duplicate(),
 		"district_id_by_index": district_id_by_index.duplicate(),
 		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"archetype_by_index": archetype_by_index.duplicate(),
 		"land_value_by_index": land_value_by_index.duplicate(),
 		"noise_by_index": noise_by_index.duplicate(),
 		"crime_by_index": crime_by_index.duplicate(),
@@ -1685,6 +1766,7 @@ func _restore_edit_state(state: Dictionary) -> void:
 	var levels_v: Variant = state.get("building_level_by_index", [])
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
+	var archetypes_v: Variant = state.get("archetype_by_index", null)
 	var land_v: Variant = state.get("land_value_by_index", [])
 	var noise_v: Variant = state.get("noise_by_index", [])
 	var crime_v: Variant = state.get("crime_by_index", [])
@@ -1710,6 +1792,7 @@ func _restore_edit_state(state: Dictionary) -> void:
 	building_level_by_index.clear()
 	district_id_by_index.clear()
 	style_profile_by_index.clear()
+	archetype_by_index.clear()
 	land_value_by_index.clear()
 	noise_by_index.clear()
 	crime_by_index.clear()
@@ -1719,6 +1802,9 @@ func _restore_edit_state(state: Dictionary) -> void:
 	var levels: Array = levels_v
 	var districts: Array = districts_v
 	var styles: Array = styles_v
+	var archetypes: Array = []
+	if typeof(archetypes_v) == TYPE_ARRAY:
+		archetypes = archetypes_v
 	var land_values: Array = land_v
 	var noise_values: Array = noise_v
 	var crime_values: Array = crime_v
@@ -1729,6 +1815,8 @@ func _restore_edit_state(state: Dictionary) -> void:
 	if districts.size() != zones.size():
 		return
 	if styles.size() != zones.size():
+		return
+	if not archetypes.is_empty() and archetypes.size() != zones.size():
 		return
 	if land_values.size() != zones.size():
 		return
@@ -1743,6 +1831,10 @@ func _restore_edit_state(state: Dictionary) -> void:
 		building_level_by_index.append(int(levels[i]))
 		district_id_by_index.append(String(districts[i]))
 		style_profile_by_index.append(String(styles[i]))
+		if archetypes.is_empty():
+			archetype_by_index.append(_default_archetype_for_district(String(districts[i])))
+		else:
+			archetype_by_index.append(String(archetypes[i]))
 		land_value_by_index.append(float(land_values[i]))
 		noise_by_index.append(float(noise_values[i]))
 		crime_by_index.append(float(crime_values[i]))

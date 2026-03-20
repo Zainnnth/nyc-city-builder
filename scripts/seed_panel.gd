@@ -270,7 +270,7 @@ func _refresh_demand_bars() -> void:
 		var service_stress: float = float(row_data.get("service_stress", 0.0))
 		var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
 		var active_event: String = String(row_data.get("active_event", "None"))
-		var identity_tag: String = _district_identity_tag(district_id)
+		var identity_tag: String = String(row_data.get("primary_archetype", _district_identity_tag(district_id))).replace("_", " ")
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -324,7 +324,7 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var service_stress: float = float(row_data.get("service_stress", 0.0))
 	var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
 	var active_event: String = String(row_data.get("active_event", "None"))
-	var identity_tag: String = _district_identity_tag(district_id)
+	var identity_tag: String = String(row_data.get("primary_archetype", _district_identity_tag(district_id))).replace("_", " ")
 	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name

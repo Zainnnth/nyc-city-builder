@@ -52,8 +52,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Includes live average overlay metrics
   - District identity pass (v1):
     - `midtown_core` now uses higher signage density and accent tinting
-    - District archetype tags appear in demand rows/popup
-    - Identity profile values can tune commercial growth/tax/noise behavior
+    - Identity packs loaded for Midtown, LES, Harlem, FiDi, and Queens West
+    - District archetypes are seeded per tile and surfaced in demand rows/popup
+    - Identity profile values tune commercial growth/tax/noise behavior
+    - Archetype-linked signage rendering changes stripe density/color patterns
   - District event controls:
     - Auto-spawned events by district (`Blackout`, `Transit Strike`, `Heatwave`)
     - Manual `Trigger Event` button for balancing tests

@@ -193,13 +193,15 @@ func _map_records_to_grid(records: Array[Dictionary]) -> Array[Dictionary]:
 		var style_cfg: Dictionary = _style_cfg(style_profile)
 		var level_bias: float = float(style_cfg.get("seed_level_bias", 0.0))
 		var seed_level := clampi(int(round(float(rec["height_m"]) / 35.0 + level_bias)), 1, 3)
+		var archetype: String = _pick_archetype(district_id)
 
 		result.append(
 			{
 				"cell": Vector2i(cell_x, cell_y),
 				"district_id": district_id,
 				"style_profile": style_profile,
-				"seed_level": seed_level
+				"seed_level": seed_level,
+				"archetype": archetype
 			}
 		)
 	return _expand_seed_clusters(result, columns, rows)
@@ -235,12 +237,35 @@ func _expand_seed_clusters(base_records: Array[Dictionary], columns: int, rows: 
 					"cell": cell,
 					"district_id": String(rec.get("district_id", "outer_borough_mix")),
 					"style_profile": style_profile,
-					"seed_level": growth_level
+					"seed_level": growth_level,
+					"archetype": String(rec.get("archetype", _pick_archetype(String(rec.get("district_id", "outer_borough_mix")))))
 				}
 				expanded.append(seeded)
 				occupied[k] = true
 
 	return expanded
+
+func _pick_archetype(district_id: String) -> String:
+	var identity: Dictionary = _identity_for_district(district_id)
+	var archetypes_v: Variant = identity.get("archetypes", [])
+	if typeof(archetypes_v) != TYPE_ARRAY:
+		return "mixed_block_generic"
+	var archetypes: Array = archetypes_v
+	if archetypes.is_empty():
+		return "mixed_block_generic"
+	var idx: int = rng.randi_range(0, archetypes.size() - 1)
+	return String(archetypes[idx])
+
+func _identity_for_district(district_id: String) -> Dictionary:
+	var districts_v: Variant = district_identity_profiles.get("districts", {})
+	if typeof(districts_v) == TYPE_DICTIONARY:
+		var districts: Dictionary = districts_v
+		if districts.has(district_id):
+			return Dictionary(districts[district_id])
+	var fallback_v: Variant = district_identity_profiles.get("fallback", {})
+	if typeof(fallback_v) == TYPE_DICTIONARY:
+		return Dictionary(fallback_v)
+	return {}
 
 func _style_cfg(style_profile: String) -> Dictionary:
 	if style_profiles.has(style_profile):
