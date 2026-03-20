@@ -13,6 +13,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 
 - Project roadmap and build checklist:
   - `docs/ROADMAP.md`
+- Development workflow:
+  - `docs/DEVELOPMENT_PLAYBOOK.md`
 
 ## Current Prototype
 
@@ -123,6 +125,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 
 - Harness script: `scripts/smoke_harness.gd`
 - Runner: `tools/smoke/run_smoke.ps1`
+- Full local dev gate:
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/run_all_checks.ps1`
 - Run:
   - `powershell -ExecutionPolicy Bypass -File tools/smoke/run_smoke.ps1`
 - The harness validates:
@@ -159,7 +163,7 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. District identity content packs (Midtown, LES, Harlem, FiDi, Queens West).
-2. Style-linked building archetypes and signage density.
-3. Atmosphere pass: haze, sodium lights, retro UI accents.
-4. Audio bed by district mood/state.
+1. Scenario authoring pack (goal cards + parameter presets).
+2. Performance pass for larger grids and longer sessions.
+3. Release automation to export and upload build artifacts on tags.
+4. Expanded deterministic simulation assertions in smoke harness.
