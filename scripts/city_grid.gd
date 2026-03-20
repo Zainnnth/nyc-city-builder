@@ -15,6 +15,10 @@ enum Tool {
 const GRID_LINE_COLOR := Color(0.27, 0.31, 0.39, 0.85)
 const BORDER_COLOR := Color(0.9, 0.52, 0.19, 0.9)
 const BACKDROP_COLOR := Color(0.08, 0.09, 0.15, 0.98)
+const HAZE_SKY_COLOR := Color(0.11, 0.12, 0.2, 1.0)
+const HAZE_HORIZON_COLOR := Color(0.30, 0.23, 0.27, 0.95)
+const SODIUM_LIGHT_COLOR := Color(0.92, 0.61, 0.24, 0.17)
+const RETRO_TEAL_COLOR := Color(0.24, 0.71, 0.68, 0.45)
 const ROAD_COLOR := Color(0.24, 0.26, 0.31, 1.0)
 const EMPTY_LOT_COLOR := Color(0.11, 0.13, 0.2, 0.95)
 const OUTLINE_COLOR := Color(0.08, 0.09, 0.13, 0.95)
@@ -187,10 +191,13 @@ const EVENT_BASE_DURATION := {
 
 var overlay_mode := OVERLAY_NONE
 var overlay_alpha := 0.42
+var atmosphere_time := 0.0
+var atmosphere_redraw_accum := 0.0
+const ATMOSPHERE_REDRAW_STEP := 0.16
 
 func _draw() -> void:
 	var map_size := Vector2(columns * cell_size, rows * cell_size)
-	draw_rect(Rect2(Vector2.ZERO, map_size), BACKDROP_COLOR, true)
+	_draw_atmosphere_background(map_size)
 
 	for y in rows:
 		for x in columns:
@@ -200,6 +207,7 @@ func _draw() -> void:
 			draw_rect(rect, GRID_LINE_COLOR, false, 1.0)
 
 	draw_rect(Rect2(Vector2.ZERO, map_size), BORDER_COLOR, false, 3.0)
+	_draw_atmosphere_foreground(map_size)
 	_draw_hud(map_size)
 	_draw_tool_legend(map_size)
 
@@ -209,13 +217,23 @@ func _ready() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	atmosphere_time += delta
+	atmosphere_redraw_accum += delta
+	var needs_redraw := false
+	if atmosphere_redraw_accum >= ATMOSPHERE_REDRAW_STEP:
+		atmosphere_redraw_accum = 0.0
+		needs_redraw = true
 	if sim_paused:
+		if needs_redraw:
+			queue_redraw()
 		return
 	sim_timer += delta
 	var step_size: float = SIM_STEP_SECONDS / max(sim_speed, 0.001)
 	while sim_timer >= step_size:
 		sim_timer -= step_size
 		_run_sim_step()
+		needs_redraw = true
+	if needs_redraw:
 		queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -369,7 +387,7 @@ func _draw_hud(map_size: Vector2) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT,
 		map_size.x - 32,
 		22,
-		Color(0.83, 0.86, 0.93, 0.92)
+		_retro_ui_color(Color(0.83, 0.86, 0.93, 0.92), 0.26)
 	)
 
 	var sim_text := "Connected Zones - Res: %d  Com: %d  Ind: %d" % [
@@ -385,7 +403,7 @@ func _draw_hud(map_size: Vector2) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT,
 		map_size.x - 32,
 		20,
-		Color(0.73, 0.78, 0.9, 0.92)
+		_retro_ui_color(Color(0.73, 0.78, 0.9, 0.92), 0.18)
 	)
 
 func _draw_tool_legend(map_size: Vector2) -> void:
@@ -397,8 +415,61 @@ func _draw_tool_legend(map_size: Vector2) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT,
 		map_size.x - 32,
 		20,
-		Color(0.63, 0.69, 0.81, 0.95)
+		_retro_ui_color(Color(0.63, 0.69, 0.81, 0.95), 0.15)
 	)
+
+func _draw_atmosphere_background(map_size: Vector2) -> void:
+	var bands := 7
+	for band in range(bands):
+		var t: float = float(band) / float(max(bands - 1, 1))
+		var y0: float = map_size.y * t
+		var y1: float = map_size.y * float(band + 1) / float(bands)
+		var color: Color = HAZE_SKY_COLOR.lerp(HAZE_HORIZON_COLOR, t)
+		draw_rect(Rect2(0.0, y0, map_size.x, y1 - y0), color, true)
+	draw_rect(Rect2(Vector2.ZERO, map_size), BACKDROP_COLOR, true)
+
+func _draw_atmosphere_foreground(map_size: Vector2) -> void:
+	var event_haze_bonus := 0.0
+	if active_event_id == EVENT_HEATWAVE:
+		event_haze_bonus = 0.07
+	elif active_event_id == EVENT_BLACKOUT:
+		event_haze_bonus = 0.04
+	var noise_haze: float = clamp(avg_noise / 260.0, 0.02, 0.32)
+	var pulse: float = 0.5 + 0.5 * sin(atmosphere_time * 1.3)
+	var haze_alpha: float = clamp(noise_haze + event_haze_bonus + pulse * 0.02, 0.04, 0.38)
+	draw_rect(Rect2(Vector2.ZERO, map_size), Color(0.79, 0.64, 0.38, haze_alpha), true)
+	_draw_sodium_pools()
+	_draw_scanlines(map_size)
+
+func _draw_sodium_pools() -> void:
+	for y in range(rows):
+		for x in range(columns):
+			var i := _to_index(Vector2i(x, y))
+			var should_glow := false
+			var zone: int = zone_by_index[i]
+			if road_by_index[i]:
+				should_glow = _tile_noise01(i, 73) > 0.56
+			elif zone == Tool.COMMERCIAL and building_level_by_index[i] > 0:
+				should_glow = _tile_noise01(i, 91) > 0.42
+			if not should_glow:
+				continue
+			var center := (Vector2(x, y) + Vector2(0.5, 0.5)) * cell_size
+			var radius: float = cell_size * (0.22 + _tile_noise01(i, 33) * 0.24)
+			var alpha_scale: float = 0.8 + (0.2 * (0.5 + 0.5 * sin(atmosphere_time * 2.6 + float(i) * 0.03)))
+			draw_circle(center, radius, Color(SODIUM_LIGHT_COLOR.r, SODIUM_LIGHT_COLOR.g, SODIUM_LIGHT_COLOR.b, SODIUM_LIGHT_COLOR.a * alpha_scale))
+			if zone == Tool.COMMERCIAL:
+				draw_circle(center, radius * 0.58, Color(RETRO_TEAL_COLOR.r, RETRO_TEAL_COLOR.g, RETRO_TEAL_COLOR.b, RETRO_TEAL_COLOR.a * 0.45))
+
+func _draw_scanlines(map_size: Vector2) -> void:
+	var stride := int(max(5.0, round(cell_size / 10.0)))
+	var line_color := Color(0.0, 0.0, 0.0, 0.07)
+	for y in range(0, int(map_size.y), stride):
+		draw_line(Vector2(0.0, float(y)), Vector2(map_size.x, float(y)), line_color, 1.0)
+
+func _retro_ui_color(base: Color, accent_mix: float) -> Color:
+	var pulse: float = 0.5 + 0.5 * sin(atmosphere_time * 2.2)
+	var accent := Color(0.91, 0.62, 0.25, base.a)
+	return base.lerp(accent, clamp(accent_mix * (0.75 + pulse * 0.25), 0.0, 0.45))
 
 func _paint_at_mouse_position() -> void:
 	var local_mouse := to_local(get_global_mouse_position())
@@ -825,6 +896,8 @@ func reset_grid() -> void:
 	redo_stack.clear()
 	sim_tick = 0
 	sim_timer = 0.0
+	atmosphere_time = 0.0
+	atmosphere_redraw_accum = 0.0
 	sim_speed = 1.0
 	sim_paused = false
 	queue_redraw()
@@ -1498,6 +1571,8 @@ func import_state(state: Dictionary) -> bool:
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_timer = 0.0
+	atmosphere_time = 0.0
+	atmosphere_redraw_accum = 0.0
 	queue_redraw()
 	return true
 

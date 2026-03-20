@@ -154,6 +154,7 @@ func _ready() -> void:
 	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
 	popup_panel.visible = false
 	milestone_banner.visible = false
+	_apply_retro_ui_theme()
 	_init_slot_ui()
 	_init_overlay_ui()
 	_refresh_service_controls()
@@ -747,3 +748,95 @@ func _update_time_buttons() -> void:
 	pause_button.text = "Resume" if paused else "Pause"
 	speed_1x_button.disabled = paused or is_equal_approx(speed, 1.0)
 	speed_3x_button.disabled = paused or is_equal_approx(speed, 3.0)
+
+func _apply_retro_ui_theme() -> void:
+	var panel_bg := Color(0.09, 0.1, 0.16, 0.9)
+	var panel_border := Color(0.87, 0.55, 0.24, 0.86)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = panel_bg
+	panel_style.border_width_left = 2
+	panel_style.border_width_top = 2
+	panel_style.border_width_right = 2
+	panel_style.border_width_bottom = 2
+	panel_style.border_color = panel_border
+	panel_style.corner_radius_top_left = 2
+	panel_style.corner_radius_top_right = 2
+	panel_style.corner_radius_bottom_left = 2
+	panel_style.corner_radius_bottom_right = 2
+
+	var panel_paths: Array[String] = [
+		"Panel",
+		"DemandPanel",
+		"ServicesPanel",
+		"EconomyPanel",
+		"AlertsPanel",
+		"OverlayPanel",
+		"EventPanel",
+		"ObjectivesPanel",
+		"DistrictPopup",
+		"MilestoneBanner"
+	]
+	for panel_path in panel_paths:
+		var node: Node = get_node_or_null(panel_path)
+		if node is PanelContainer:
+			var panel_node: PanelContainer = node
+			panel_node.add_theme_stylebox_override("panel", panel_style.duplicate())
+
+	var button_normal := StyleBoxFlat.new()
+	button_normal.bg_color = Color(0.14, 0.17, 0.25, 0.96)
+	button_normal.border_width_left = 1
+	button_normal.border_width_top = 1
+	button_normal.border_width_right = 1
+	button_normal.border_width_bottom = 1
+	button_normal.border_color = Color(0.25, 0.72, 0.69, 0.85)
+	button_normal.corner_radius_top_left = 2
+	button_normal.corner_radius_top_right = 2
+	button_normal.corner_radius_bottom_left = 2
+	button_normal.corner_radius_bottom_right = 2
+
+	var button_hover: StyleBoxFlat = button_normal.duplicate()
+	button_hover.bg_color = Color(0.18, 0.22, 0.31, 0.98)
+	button_hover.border_color = Color(0.91, 0.62, 0.28, 0.9)
+
+	var button_pressed: StyleBoxFlat = button_normal.duplicate()
+	button_pressed.bg_color = Color(0.21, 0.14, 0.12, 0.98)
+	button_pressed.border_color = Color(0.91, 0.62, 0.28, 1.0)
+
+	for btn in _all_buttons():
+		btn.add_theme_stylebox_override("normal", button_normal.duplicate())
+		btn.add_theme_stylebox_override("hover", button_hover.duplicate())
+		btn.add_theme_stylebox_override("pressed", button_pressed.duplicate())
+		btn.add_theme_color_override("font_color", Color(0.83, 0.87, 0.95, 0.98))
+		btn.add_theme_color_override("font_hover_color", Color(0.94, 0.67, 0.3, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.98, 0.84, 0.62, 1.0))
+
+	_apply_label_palette(self)
+
+func _all_buttons() -> Array[Button]:
+	return [
+		apply_button,
+		random_button,
+		save_button,
+		load_button,
+		load_latest_button,
+		pause_button,
+		speed_1x_button,
+		speed_3x_button,
+		preset_balanced_button,
+		preset_midtown_button,
+		preset_boroughs_button,
+		policy_balanced_button,
+		policy_growth_button,
+		policy_profit_button,
+		close_popup_button,
+		trigger_event_button
+	]
+
+func _apply_label_palette(root: Node) -> void:
+	for child in root.get_children():
+		if child is Label:
+			var label: Label = child
+			label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.93, 0.98))
+			if label.text.find("Title") != -1:
+				label.add_theme_color_override("font_color", Color(0.95, 0.66, 0.32, 0.98))
+		_apply_label_palette(child)

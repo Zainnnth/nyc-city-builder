@@ -60,6 +60,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Auto-spawned events by district (`Blackout`, `Transit Strike`, `Heatwave`)
     - Manual `Trigger Event` button for balancing tests
     - Active/cooldown status + latest event history
+  - Atmosphere pass (v1):
+    - Animated haze and sodium-light pools across the map
+    - Retro scanline treatment and pulsing HUD accent colors
+    - CRT-inspired panel/button skin for the management UI
   - Economy snapshot panel with per-tick deltas and pressure indicators.
   - City alerts panel for budget, pressure, and connectivity warnings.
   - Objectives panel for milestone progression.
