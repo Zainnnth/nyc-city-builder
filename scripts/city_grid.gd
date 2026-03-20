@@ -86,6 +86,12 @@ var road_cluster_count := 0
 var largest_road_cluster := 0
 var road_efficiency := 1.0
 var avg_commute_penalty := 0.0
+var service_levels := {
+	"police": 55.0,
+	"fire": 55.0,
+	"sanitation": 55.0,
+	"transit": 55.0
+}
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -234,6 +240,12 @@ func _draw_hud(map_size: Vector2) -> void:
 	]
 	var speed_text := "Paused" if sim_paused else ("%.1fx" % sim_speed)
 	text += "   |   Sim: %s" % speed_text
+	text += "   |   Svc P/F/S/T: %d/%d/%d/%d" % [
+		int(round(float(service_levels.get("police", 0.0)))),
+		int(round(float(service_levels.get("fire", 0.0)))),
+		int(round(float(service_levels.get("sanitation", 0.0)))),
+		int(round(float(service_levels.get("transit", 0.0))))
+	]
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(16, map_size.y + 36),
@@ -313,6 +325,7 @@ func _run_sim_step() -> void:
 	var job_capacity := 0
 	var road_upkeep_cost := 0.0
 	var zone_upkeep_cost := 0.0
+	var service_upkeep_cost := 0.0
 	var tax_income_raw := 0.0
 	var district_stats := {}
 	var road_graph: Dictionary = _build_road_graph_metrics()
@@ -364,7 +377,8 @@ func _run_sim_step() -> void:
 			var style_profile: String = style_profile_by_index[i]
 			var policy_id: String = get_district_policy(district_id)
 			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult
+			var zone_service_mult: float = _zone_service_multiplier(zone)
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -383,9 +397,12 @@ func _run_sim_step() -> void:
 			var tile_output := (float(level) * 4.0) + 3.0
 			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id)
 			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id)
+			service_upkeep_cost += _zone_service_cost(zone)
 			stat["level_sum"] = int(stat["level_sum"]) + level
 			stat["traffic_penalty_sum"] = float(stat["traffic_penalty_sum"]) + commute_penalty
 			stat["traffic_samples"] = int(stat["traffic_samples"]) + 1
+			stat["service_penalty_sum"] = float(stat["service_penalty_sum"]) + (1.0 - zone_service_mult)
+			stat["service_samples"] = int(stat["service_samples"]) + 1
 			district_stats[district_id] = stat
 			penalty_sum += commute_penalty
 			penalty_count += 1
@@ -395,7 +412,7 @@ func _run_sim_step() -> void:
 	jobs = int(lerp(float(jobs), float(job_capacity), 0.35))
 
 	var tax_income := int(round(population * 0.7 + jobs * 0.45 + tax_income_raw))
-	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost))
+	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost + service_upkeep_cost))
 	var net_cashflow := tax_income - upkeep
 	money += net_cashflow
 	if net_cashflow > 0:
@@ -589,6 +606,10 @@ func reset_grid() -> void:
 	largest_road_cluster = 0
 	road_efficiency = 1.0
 	avg_commute_penalty = 0.0
+	service_levels["police"] = 55.0
+	service_levels["fire"] = 55.0
+	service_levels["sanitation"] = 55.0
+	service_levels["transit"] = 55.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_tick = 0
@@ -679,7 +700,9 @@ func _ensure_district_stat(stats: Dictionary, district_id: String) -> void:
 		"ind_zones": 0,
 		"level_sum": 0,
 		"traffic_penalty_sum": 0.0,
-		"traffic_samples": 0
+		"traffic_samples": 0,
+		"service_penalty_sum": 0.0,
+		"service_samples": 0
 	}
 
 func _update_district_demand_snapshot(stats: Dictionary) -> void:
@@ -703,12 +726,15 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 		var avg_level: float = float(stat["level_sum"]) / float(max(connected, 1))
 		var traffic_samples: int = int(stat["traffic_samples"])
 		var traffic_stress: float = 0.0 if traffic_samples == 0 else float(stat["traffic_penalty_sum"]) / float(traffic_samples)
+		var service_samples: int = int(stat["service_samples"])
+		var service_stress: float = 0.0 if service_samples == 0 else float(stat["service_penalty_sum"]) / float(service_samples)
 		var maturity_factor: float = clamp(avg_level / 3.0, 0.0, 1.0)
 
 		var traffic_penalty_points: float = traffic_stress * 34.0
-		var res_demand: float = clamp(50.0 + (housing_pressure - 1.0) * 38.0 + (1.0 - res_share) * 10.0 + (connected_ratio - 0.5) * 14.0 - traffic_penalty_points, 0.0, 100.0)
-		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0 - traffic_penalty_points, 0.0, 100.0)
-		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0 - traffic_penalty_points * 0.8, 0.0, 100.0)
+		var service_penalty_points: float = service_stress * 28.0
+		var res_demand: float = clamp(50.0 + (housing_pressure - 1.0) * 38.0 + (1.0 - res_share) * 10.0 + (connected_ratio - 0.5) * 14.0 - traffic_penalty_points - service_penalty_points, 0.0, 100.0)
+		var com_demand: float = clamp(50.0 + (job_pressure - 1.0) * 32.0 + (1.0 - com_share) * 8.0 + (connected_ratio - 0.5) * 10.0 - traffic_penalty_points - service_penalty_points, 0.0, 100.0)
+		var ind_demand: float = clamp(42.0 + (job_pressure - 1.0) * 24.0 + (1.0 - ind_share) * 12.0 - maturity_factor * 12.0 - traffic_penalty_points * 0.8 - service_penalty_points, 0.0, 100.0)
 		var composite: float = clamp((res_demand * 0.4) + (com_demand * 0.35) + (ind_demand * 0.25), 0.0, 100.0)
 		var policy_id: String = get_district_policy(district_id)
 
@@ -718,6 +744,7 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 				"policy_id": policy_id,
 				"demand_index": composite,
 				"traffic_stress": traffic_stress,
+				"service_stress": service_stress,
 				"res_demand": res_demand,
 				"com_demand": com_demand,
 				"ind_demand": ind_demand
@@ -758,6 +785,43 @@ func _policy_tax_multiplier(policy_id: String) -> float:
 func _policy_upkeep_multiplier(policy_id: String) -> float:
 	return float(POLICY_UPKEEP_MULT.get(policy_id, 1.0))
 
+func set_service_level(service_id: String, level: float) -> void:
+	if not service_levels.has(service_id):
+		return
+	service_levels[service_id] = clamp(level, 0.0, 100.0)
+
+func get_service_levels() -> Dictionary:
+	return service_levels.duplicate(true)
+
+func _service_norm(service_id: String) -> float:
+	return clamp(float(service_levels.get(service_id, 0.0)) / 100.0, 0.0, 1.0)
+
+func _zone_service_multiplier(zone: int) -> float:
+	if zone == Tool.RESIDENTIAL:
+		var police := _service_norm("police")
+		var transit := _service_norm("transit")
+		return clamp(0.62 + police * 0.20 + transit * 0.20, 0.65, 1.15)
+	if zone == Tool.COMMERCIAL:
+		var transit_c := _service_norm("transit")
+		var sanitation_c := _service_norm("sanitation")
+		var police_c := _service_norm("police")
+		return clamp(0.60 + transit_c * 0.2 + sanitation_c * 0.12 + police_c * 0.1, 0.62, 1.16)
+	if zone == Tool.INDUSTRIAL:
+		var fire_i := _service_norm("fire")
+		var sanitation_i := _service_norm("sanitation")
+		var transit_i := _service_norm("transit")
+		return clamp(0.58 + fire_i * 0.22 + sanitation_i * 0.16 + transit_i * 0.1, 0.6, 1.15)
+	return 1.0
+
+func _zone_service_cost(zone: int) -> float:
+	if zone == Tool.RESIDENTIAL:
+		return 0.55 * (_service_norm("police") + _service_norm("transit"))
+	if zone == Tool.COMMERCIAL:
+		return 0.5 * (_service_norm("police") + _service_norm("sanitation") + _service_norm("transit"))
+	if zone == Tool.INDUSTRIAL:
+		return 0.58 * (_service_norm("fire") + _service_norm("sanitation") + _service_norm("transit"))
+	return 0.0
+
 func export_state() -> Dictionary:
 	return {
 		"columns": columns,
@@ -774,6 +838,7 @@ func export_state() -> Dictionary:
 		"style_profile_by_index": style_profile_by_index.duplicate(),
 		"district_policy_map": district_policy_map.duplicate(true)
 		,
+		"service_levels": service_levels.duplicate(true),
 		"sim_speed": sim_speed,
 		"sim_paused": sim_paused,
 		"sim_tick": sim_tick,
@@ -795,6 +860,7 @@ func import_state(state: Dictionary) -> bool:
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
+	var services_v: Variant = state.get("service_levels", {})
 	var history_v: Variant = state.get("economy_history", [])
 
 	if typeof(zones_v) != TYPE_ARRAY:
@@ -808,6 +874,8 @@ func import_state(state: Dictionary) -> bool:
 	if typeof(styles_v) != TYPE_ARRAY:
 		return false
 	if typeof(policies_v) != TYPE_DICTIONARY:
+		return false
+	if typeof(services_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(history_v) != TYPE_ARRAY:
 		return false
@@ -843,6 +911,11 @@ func import_state(state: Dictionary) -> bool:
 		style_profile_by_index.append(String(styles[i]))
 
 	district_policy_map = Dictionary(policies_v).duplicate(true)
+	var service_dict: Dictionary = Dictionary(services_v)
+	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
+	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
+	service_levels["sanitation"] = clamp(float(service_dict.get("sanitation", 55.0)), 0.0, 100.0)
+	service_levels["transit"] = clamp(float(service_dict.get("transit", 55.0)), 0.0, 100.0)
 	money = int(state.get("money", 8000))
 	population = int(state.get("population", 0))
 	jobs = int(state.get("jobs", 0))
@@ -951,6 +1024,14 @@ func _update_active_alerts() -> void:
 		_push_alert("warning", "Fragmented Roads", "Road network is split into many clusters.")
 	if avg_commute_penalty > 0.22:
 		_push_alert("warning", "Commute Stress", "Road capacity is hurting district growth.")
+	if float(service_levels.get("police", 0.0)) < 40.0:
+		_push_alert("warning", "Police Coverage Low", "Safety service level is below target.")
+	if float(service_levels.get("fire", 0.0)) < 40.0:
+		_push_alert("warning", "Fire Coverage Low", "Fire response coverage is below target.")
+	if float(service_levels.get("sanitation", 0.0)) < 40.0:
+		_push_alert("warning", "Sanitation Low", "Cleanliness service level is below target.")
+	if float(service_levels.get("transit", 0.0)) < 40.0:
+		_push_alert("warning", "Transit Coverage Low", "Mobility service level is below target.")
 
 	if housing_pressure > 1.25:
 		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")

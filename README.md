@@ -44,6 +44,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - `Balanced Preset`
     - `Midtown Boom`
     - `Borough Buildout`
+  - Service layer controls:
+    - `Police`, `Fire`, `Sanitation`, `Transit` sliders
+    - Directly influence growth, upkeep, demand stress, and alerts
   - Economy snapshot panel with per-tick deltas and pressure indicators.
   - City alerts panel for budget, pressure, and connectivity warnings.
   - Objectives panel for milestone progression.

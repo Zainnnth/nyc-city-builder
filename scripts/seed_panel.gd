@@ -21,6 +21,14 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var preset_boroughs_button: Button = $Panel/VBox/Presets/BoroughPresetButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
+@onready var police_slider: HSlider = $ServicesPanel/VBox/PoliceRow/PoliceSlider
+@onready var police_value: Label = $ServicesPanel/VBox/PoliceRow/PoliceValue
+@onready var fire_slider: HSlider = $ServicesPanel/VBox/FireRow/FireSlider
+@onready var fire_value: Label = $ServicesPanel/VBox/FireRow/FireValue
+@onready var sanitation_slider: HSlider = $ServicesPanel/VBox/SanitationRow/SanitationSlider
+@onready var sanitation_value: Label = $ServicesPanel/VBox/SanitationRow/SanitationValue
+@onready var transit_slider: HSlider = $ServicesPanel/VBox/TransitRow/TransitSlider
+@onready var transit_value: Label = $ServicesPanel/VBox/TransitRow/TransitValue
 @onready var econ_money: Label = $EconomyPanel/VBox/EconMoney
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
@@ -50,6 +58,7 @@ var autosave_timer := 0.0
 var autosave_next_slot := 1
 const AUTOSAVE_INTERVAL := 20.0
 var banner_acknowledged := false
+var is_syncing_services := false
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -127,6 +136,10 @@ func _ready() -> void:
 	preset_balanced_button.pressed.connect(_on_apply_preset.bind("balanced"))
 	preset_midtown_button.pressed.connect(_on_apply_preset.bind("midtown_boom"))
 	preset_boroughs_button.pressed.connect(_on_apply_preset.bind("borough_buildout"))
+	police_slider.value_changed.connect(_on_service_changed.bind("police"))
+	fire_slider.value_changed.connect(_on_service_changed.bind("fire"))
+	sanitation_slider.value_changed.connect(_on_service_changed.bind("sanitation"))
+	transit_slider.value_changed.connect(_on_service_changed.bind("transit"))
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -135,6 +148,7 @@ func _ready() -> void:
 	popup_panel.visible = false
 	milestone_banner.visible = false
 	_init_slot_ui()
+	_refresh_service_controls()
 	_refresh_economy()
 	_refresh_objectives()
 
@@ -143,6 +157,7 @@ func _process(delta: float) -> void:
 	if ui_timer >= 0.4:
 		ui_timer = 0.0
 		_refresh_demand_bars()
+		_refresh_service_controls()
 		_refresh_economy()
 		_refresh_objectives()
 		_refresh_alerts()
@@ -397,6 +412,41 @@ func _refresh_economy() -> void:
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
 	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f" % [housing_p, job_p]
 
+func _on_service_changed(value: float, service_id: String) -> void:
+	if is_syncing_services:
+		return
+	if city_grid == null:
+		return
+	if not city_grid.has_method("set_service_level"):
+		return
+	city_grid.call("set_service_level", service_id, value)
+	_update_service_labels()
+
+func _refresh_service_controls() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_service_levels"):
+		return
+
+	var levels_v: Variant = city_grid.call("get_service_levels")
+	if typeof(levels_v) != TYPE_DICTIONARY:
+		return
+	var levels: Dictionary = levels_v
+
+	is_syncing_services = true
+	police_slider.value = float(levels.get("police", police_slider.value))
+	fire_slider.value = float(levels.get("fire", fire_slider.value))
+	sanitation_slider.value = float(levels.get("sanitation", sanitation_slider.value))
+	transit_slider.value = float(levels.get("transit", transit_slider.value))
+	is_syncing_services = false
+	_update_service_labels()
+
+func _update_service_labels() -> void:
+	police_value.text = str(int(round(police_slider.value)))
+	fire_value.text = str(int(round(fire_slider.value)))
+	sanitation_value.text = str(int(round(sanitation_slider.value)))
+	transit_value.text = str(int(round(transit_slider.value)))
+
 func _refresh_objectives() -> void:
 	if city_grid == null:
 		return
@@ -534,6 +584,7 @@ func _on_apply_preset(preset_id: String) -> void:
 
 	status_label.text = "Scenario loaded: %s" % scenario_name
 	_refresh_demand_bars()
+	_refresh_service_controls()
 	_refresh_economy()
 	_refresh_objectives()
 	_refresh_alerts()
