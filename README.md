@@ -119,6 +119,18 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `godot --headless --path . --export-release "Web" build/web/index.html`
 - Note: release templates must be installed in Godot for exports to succeed.
 
+## Smoke Checks
+
+- Harness script: `scripts/smoke_harness.gd`
+- Runner: `tools/smoke/run_smoke.ps1`
+- Run:
+  - `powershell -ExecutionPolicy Bypass -File tools/smoke/run_smoke.ps1`
+- The harness validates:
+  - Main scene boot and required nodes (`CityGrid`, `DistrictGenerator`, `SeedPanel`, `AudioBed`)
+  - Core simulation API snapshots and shape checks
+  - State export/import roundtrip
+  - District regeneration call path
+
 ## Legal-Safe Data Pipeline
 
 - Pipeline docs: `tools/pipeline/README.md`

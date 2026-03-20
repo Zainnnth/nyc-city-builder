@@ -45,4 +45,4 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Balance pass and scenario tuning (profile-based tuning controls)
 - [x] Tutorial onboarding and tooltips
 - [x] Build settings and export presets
-- [ ] Regression smoke checks and basic test harness
+- [x] Regression smoke checks and basic test harness
