@@ -1,0 +1,30 @@
+{
+  "allowed_sources": [
+    {
+      "source_id": "nyc_open_data",
+      "display_name": "NYC Open Data",
+      "license_ids": ["NYC_OPEN_DATA"],
+      "usage": ["commercial", "non_commercial", "derivative_ok"]
+    },
+    {
+      "source_id": "openstreetmap",
+      "display_name": "OpenStreetMap",
+      "license_ids": ["ODBL_1_0"],
+      "usage": ["commercial", "non_commercial", "attribution_required", "share_alike"]
+    },
+    {
+      "source_id": "usgs_lidar",
+      "display_name": "USGS / Public LiDAR",
+      "license_ids": ["PUBLIC_DOMAIN_OR_EQUIV"],
+      "usage": ["commercial", "non_commercial", "derivative_ok"]
+    }
+  ],
+  "restricted_sources": [
+    {
+      "source_id": "google_earth_3d",
+      "display_name": "Google Earth 3D Tiles/Meshes",
+      "reason": "Extraction/reuse risk for derivative datasets and redistribution.",
+      "default_action": "reject"
+    }
+  ]
+}

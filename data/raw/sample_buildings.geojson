@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "sample_001",
+        "height_m": 92.5,
+        "yearbuilt": 1998,
+        "landuse": "commercial"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-73.9855, 40.7585],
+            [-73.9852, 40.7585],
+            [-73.9852, 40.7588],
+            [-73.9855, 40.7588],
+            [-73.9855, 40.7585]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "sample_002",
+        "numfloors": 6,
+        "yearbuilt": 1931,
+        "landuse": "residential"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-73.9468, 40.8121],
+            [-73.9465, 40.8121],
+            [-73.9465, 40.8124],
+            [-73.9468, 40.8124],
+            [-73.9468, 40.8121]
+          ]
+        ]
+      }
+    }
+  ]
+}

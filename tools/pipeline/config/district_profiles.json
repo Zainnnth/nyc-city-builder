@@ -1,0 +1,35 @@
+{
+  "districts": [
+    {
+      "district_id": "midtown_core",
+      "display_name": "Midtown Core",
+      "bbox_lon_lat": [-74.010, 40.748, -73.967, 40.770],
+      "style_profile": "towers_signage_density_high"
+    },
+    {
+      "district_id": "lower_east_side",
+      "display_name": "Lower East Side",
+      "bbox_lon_lat": [-74.005, 40.706, -73.971, 40.729],
+      "style_profile": "midrise_signage_density_medium"
+    },
+    {
+      "district_id": "harlem",
+      "display_name": "Harlem",
+      "bbox_lon_lat": [-73.958, 40.800, -73.928, 40.828],
+      "style_profile": "brownstone_mix_cultural_landmark_bias"
+    },
+    {
+      "district_id": "financial_district",
+      "display_name": "Financial District",
+      "bbox_lon_lat": [-74.018, 40.700, -73.996, 40.716],
+      "style_profile": "historic_core_tower_mix"
+    },
+    {
+      "district_id": "queens_west",
+      "display_name": "Queens West",
+      "bbox_lon_lat": [-73.964, 40.735, -73.930, 40.760],
+      "style_profile": "industrial_to_residential_transition"
+    }
+  ],
+  "fallback_district_id": "outer_borough_mix"
+}

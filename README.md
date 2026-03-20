@@ -31,6 +31,29 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 2. Import this folder: `nyc-city-builder`.
 3. Press `F5` to run.
 
+## Legal-Safe Data Pipeline
+
+- Pipeline docs: `tools/pipeline/README.md`
+- Policy config: `tools/pipeline/config/source_policies.json`
+- District config: `tools/pipeline/config/district_profiles.json`
+- Sample input: `data/raw/sample_buildings.geojson`
+
+Example run:
+
+```bash
+python tools/pipeline/scripts/ingest_buildings.py \
+  --input data/raw/sample_buildings.geojson \
+  --source-id nyc_open_data \
+  --dataset-name sample_demo \
+  --license-id NYC_OPEN_DATA \
+  --out data/processed/buildings_normalized.geojson
+
+python tools/pipeline/scripts/segment_districts.py \
+  --input data/processed/buildings_normalized.geojson \
+  --districts tools/pipeline/config/district_profiles.json \
+  --out data/processed/buildings_districted.geojson
+```
+
 ## Next Milestones
 
 1. Add demand bars and tool hotbar UI widgets.
