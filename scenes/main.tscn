@@ -282,6 +282,34 @@ size_flags_horizontal = 3
 layout_mode = 2
 text = "Land 0.0  Noise 0.0  Crime 0.0  Commute 0.0"
 
+[node name="EventPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 676.0
+offset_top = 244.0
+offset_right = 980.0
+offset_bottom = 370.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/EventPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/EventPanel/VBox"]
+layout_mode = 2
+text = "District Events"
+
+[node name="EventStatus" type="Label" parent="SeedPanel/EventPanel/VBox"]
+layout_mode = 2
+text = "Active: None (cooldown 0t)"
+
+[node name="EventHistory" type="Label" parent="SeedPanel/EventPanel/VBox"]
+layout_mode = 2
+text = "History: none"
+
+[node name="EventControls" type="HBoxContainer" parent="SeedPanel/EventPanel/VBox"]
+layout_mode = 2
+
+[node name="TriggerEventButton" type="Button" parent="SeedPanel/EventPanel/VBox/EventControls"]
+layout_mode = 2
+text = "Trigger Event"
+
 [node name="ObjectivesPanel" type="PanelContainer" parent="SeedPanel"]
 offset_left = 398.0
 offset_top = 370.0

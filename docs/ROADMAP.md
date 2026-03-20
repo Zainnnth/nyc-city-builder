@@ -29,8 +29,8 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Traffic stress per district and commute penalties
 - [x] Service layers (police/fire/sanitation/transit)
 - [x] Land value + noise/crime overlays
-- [ ] District-specific upkeep and event hooks
-- [ ] Simple disasters/events (blackout, strike, heatwave)
+- [x] District-specific upkeep and event hooks
+- [x] Simple disasters/events (blackout, strike, heatwave)
 
 ## Phase 3 - NYC Flavor Pass
 

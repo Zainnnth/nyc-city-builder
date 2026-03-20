@@ -31,6 +31,9 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var transit_value: Label = $ServicesPanel/VBox/TransitRow/TransitValue
 @onready var overlay_select: OptionButton = $OverlayPanel/VBox/OverlayRow/OverlaySelect
 @onready var overlay_stats: Label = $OverlayPanel/VBox/OverlayStats
+@onready var trigger_event_button: Button = $EventPanel/VBox/EventControls/TriggerEventButton
+@onready var event_status: Label = $EventPanel/VBox/EventStatus
+@onready var event_history: Label = $EventPanel/VBox/EventHistory
 @onready var econ_money: Label = $EconomyPanel/VBox/EconMoney
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
@@ -143,6 +146,7 @@ func _ready() -> void:
 	sanitation_slider.value_changed.connect(_on_service_changed.bind("sanitation"))
 	transit_slider.value_changed.connect(_on_service_changed.bind("transit"))
 	overlay_select.item_selected.connect(_on_overlay_selected)
+	trigger_event_button.pressed.connect(_on_trigger_event)
 	input_seed.text_submitted.connect(_on_text_submitted)
 	close_popup_button.pressed.connect(_on_close_popup)
 	policy_balanced_button.pressed.connect(_on_set_policy.bind("balanced"))
@@ -154,6 +158,7 @@ func _ready() -> void:
 	_init_overlay_ui()
 	_refresh_service_controls()
 	_refresh_economy()
+	_refresh_event_panel()
 	_refresh_objectives()
 
 func _process(delta: float) -> void:
@@ -164,6 +169,7 @@ func _process(delta: float) -> void:
 		_refresh_service_controls()
 		_refresh_overlay_controls()
 		_refresh_economy()
+		_refresh_event_panel()
 		_refresh_objectives()
 		_refresh_alerts()
 		_update_time_buttons()
@@ -262,6 +268,8 @@ func _refresh_demand_bars() -> void:
 		var policy_id: String = String(row_data.get("policy_id", "balanced"))
 		var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
 		var service_stress: float = float(row_data.get("service_stress", 0.0))
+		var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
+		var active_event: String = String(row_data.get("active_event", "None"))
 		var res_d: int = int(round(float(row_data.get("res_demand", 0.0))))
 		var com_d: int = int(round(float(row_data.get("com_demand", 0.0))))
 		var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
@@ -280,8 +288,8 @@ func _refresh_demand_bars() -> void:
 
 		var sub: Label = Label.new()
 		sub.modulate = Color(0.72, 0.78, 0.9, 0.95)
-		sub.text = "R %d  C %d  I %d  |  T %.2f  S %.2f  |  %s" % [
-			res_d, com_d, ind_d, traffic_stress, service_stress, String(POLICY_LABELS.get(policy_id, "Balanced"))
+		sub.text = "R %d  C %d  I %d  |  T %.2f  S %.2f  U %.2f  |  %s  |  %s" % [
+			res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, String(POLICY_LABELS.get(policy_id, "Balanced")), active_event
 		]
 		row.add_child(sub)
 
@@ -313,11 +321,13 @@ func _show_popup(district_id: String, row_data: Dictionary) -> void:
 	var ind_d: int = int(round(float(row_data.get("ind_demand", 0.0))))
 	var traffic_stress: float = float(row_data.get("traffic_stress", 0.0))
 	var service_stress: float = float(row_data.get("service_stress", 0.0))
+	var upkeep_hook: float = float(row_data.get("upkeep_hook", 1.0))
+	var active_event: String = String(row_data.get("active_event", "None"))
 	var policy_id: String = String(row_data.get("policy_id", "balanced"))
 
 	popup_title.text = "%s District" % district_name
-	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f\nService Stress %.2f" % [
-		demand, res_d, com_d, ind_d, traffic_stress, service_stress
+	popup_body.text = "Demand %d\nResidential %d\nCommercial %d\nIndustrial %d\nTraffic Stress %.2f\nService Stress %.2f\nUpkeep Hook %.2f\nActive Event %s" % [
+		demand, res_d, com_d, ind_d, traffic_stress, service_stress, upkeep_hook, active_event
 	]
 	popup_policy.text = "Policy: %s" % String(POLICY_LABELS.get(policy_id, "Balanced"))
 	popup_panel.visible = true
@@ -413,11 +423,17 @@ func _refresh_economy() -> void:
 	var d_jobs: int = int(snap.get("delta_jobs", 0))
 	var housing_p: float = float(snap.get("housing_pressure", 1.0))
 	var job_p: float = float(snap.get("job_pressure", 1.0))
+	var avg_upkeep_hook: float = float(snap.get("avg_upkeep_hook", 1.0))
+	var event_title: String = String(snap.get("active_event_title", "None"))
+	var event_district: String = String(snap.get("active_event_district", ""))
+	var event_ticks_left: int = int(snap.get("event_ticks_left", 0))
 
 	econ_money.text = "Money: $%d (%s%d)" % [money, "+" if d_money >= 0 else "", d_money]
 	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
-	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f" % [housing_p, job_p]
+	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f  |  Upkeep x%.2f" % [housing_p, job_p, avg_upkeep_hook]
+	if event_title != "None":
+		econ_pressure.text += "  |  %s (%s, %dt)" % [event_title, event_district, event_ticks_left]
 
 func _on_service_changed(value: float, service_id: String) -> void:
 	if is_syncing_services:
@@ -505,6 +521,56 @@ func _refresh_overlay_controls() -> void:
 	var crime: float = float(metrics.get("avg_crime", 0.0))
 	var commute: float = float(metrics.get("avg_commute_penalty", 0.0))
 	overlay_stats.text = "Land %.1f  Noise %.1f  Crime %.1f  Commute %.2f" % [land, noise, crime, commute]
+
+func _on_trigger_event() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("trigger_random_event"):
+		return
+	var ok: bool = city_grid.call("trigger_random_event")
+	if ok:
+		status_label.text = "Manual event triggered."
+	else:
+		status_label.text = "Unable to trigger event right now."
+	_refresh_event_panel()
+
+func _refresh_event_panel() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_event_snapshot"):
+		return
+	var snap_v: Variant = city_grid.call("get_event_snapshot")
+	if typeof(snap_v) != TYPE_DICTIONARY:
+		return
+	var snap: Dictionary = snap_v
+	var title: String = String(snap.get("active_event_title", "None"))
+	var district_id: String = String(snap.get("active_event_district", ""))
+	var ticks_left: int = int(snap.get("ticks_left", 0))
+	var cooldown: int = int(snap.get("cooldown_ticks", 0))
+	if title == "None":
+		event_status.text = "Active: None (cooldown %dt)" % cooldown
+	else:
+		event_status.text = "Active: %s in %s (%dt)" % [title, String(DISTRICT_NAMES.get(district_id, district_id)), ticks_left]
+
+	var recent_v: Variant = snap.get("recent_events", [])
+	if typeof(recent_v) != TYPE_ARRAY:
+		event_history.text = "History: none"
+		return
+	var recent: Array = recent_v
+	if recent.is_empty():
+		event_history.text = "History: none"
+		return
+	var latest: Dictionary = recent[recent.size() - 1]
+	var latest_title: String = String(latest.get("event_title", "Event"))
+	var latest_district: String = String(latest.get("district_id", ""))
+	var latest_state: String = String(latest.get("state", ""))
+	var latest_tick: int = int(latest.get("tick", 0))
+	event_history.text = "Last: t%d %s %s (%s)" % [
+		latest_tick,
+		latest_title,
+		String(DISTRICT_NAMES.get(latest_district, latest_district)),
+		latest_state
+	]
 
 func _refresh_objectives() -> void:
 	if city_grid == null:

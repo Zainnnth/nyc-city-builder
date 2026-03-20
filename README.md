@@ -50,13 +50,18 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Overlay controls:
     - `None`, `Land Value`, `Noise`, `Crime`
     - Includes live average overlay metrics
+  - District event controls:
+    - Auto-spawned events by district (`Blackout`, `Transit Strike`, `Heatwave`)
+    - Manual `Trigger Event` button for balancing tests
+    - Active/cooldown status + latest event history
   - Economy snapshot panel with per-tick deltas and pressure indicators.
   - City alerts panel for budget, pressure, and connectivity warnings.
   - Objectives panel for milestone progression.
   - Milestone banner appears when all objectives are complete.
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
-  - Shows traffic stress signal per district.
+  - Shows traffic stress, service stress, and district upkeep hook.
+  - Shows currently active district event (if any).
   - Updates continuously from simulation telemetry.
   - `Focus District` jumps camera to that neighborhood cluster.
   - Opens district detail popup with demand breakdown.
@@ -66,8 +71,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - `Profit` (stronger tax efficiency, slower growth)
 - Basic simulation tick (1 second):
   - Road-connected zones grow buildings.
-  - Population/jobs capacity updates.
-  - Money updates from taxes and upkeep with district/style modifiers.
+  - Population/jobs capacity updates with service and event modifiers.
+  - Money updates from taxes and upkeep with district/style/event modifiers.
+  - District-specific upkeep hooks recalculate from live stress signals.
 - Camera pan with arrow keys.
 - Mouse-wheel zoom.
 - `G` toggles district overlay visualization.
@@ -103,7 +109,7 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Add demand bars and tool hotbar UI widgets.
-2. Add road connectivity/path graph with route cost.
-3. Add district mood layers (Harlem, Lower East Side, Midtown).
-4. Replace flat lots with sprite-kit/3D hybrid tiles.
+1. District identity content packs (Midtown, LES, Harlem, FiDi, Queens West).
+2. Style-linked building archetypes and signage density.
+3. Atmosphere pass: haze, sodium lights, retro UI accents.
+4. Audio bed by district mood/state.

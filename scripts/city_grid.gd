@@ -92,12 +92,20 @@ var avg_commute_penalty := 0.0
 var avg_land_value := 0.0
 var avg_noise := 0.0
 var avg_crime := 0.0
+var district_upkeep_hook_map: Dictionary = {}
 var service_levels := {
 	"police": 55.0,
 	"fire": 55.0,
 	"sanitation": 55.0,
 	"transit": 55.0
 }
+var sim_rng := RandomNumberGenerator.new()
+var active_event_id := ""
+var active_event_district := ""
+var active_event_ticks_left := 0
+var event_cooldown_ticks := 0
+var recent_events: Array[Dictionary] = []
+const MAX_EVENT_HISTORY := 8
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -159,6 +167,21 @@ const OVERLAY_NONE := "none"
 const OVERLAY_LAND_VALUE := "land_value"
 const OVERLAY_NOISE := "noise"
 const OVERLAY_CRIME := "crime"
+const EVENT_BLACKOUT := "blackout"
+const EVENT_STRIKE := "strike"
+const EVENT_HEATWAVE := "heatwave"
+
+const EVENT_TITLES := {
+	EVENT_BLACKOUT: "Blackout",
+	EVENT_STRIKE: "Transit Strike",
+	EVENT_HEATWAVE: "Heatwave"
+}
+
+const EVENT_BASE_DURATION := {
+	EVENT_BLACKOUT: 8,
+	EVENT_STRIKE: 10,
+	EVENT_HEATWAVE: 12
+}
 
 var overlay_mode := OVERLAY_NONE
 var overlay_alpha := 0.42
@@ -179,6 +202,7 @@ func _draw() -> void:
 	_draw_tool_legend(map_size)
 
 func _ready() -> void:
+	sim_rng.randomize()
 	_init_tiles()
 	queue_redraw()
 
@@ -389,7 +413,9 @@ func _run_sim_step() -> void:
 			var i := _to_index(cell)
 
 			if road_by_index[i]:
-				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(district_id_by_index[i])
+				var road_district_id: String = district_id_by_index[i]
+				var district_upkeep_hook: float = float(district_upkeep_hook_map.get(road_district_id, 1.0))
+				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(road_district_id) * district_upkeep_hook * _event_upkeep_multiplier(road_district_id)
 				land_value_by_index[i] = 42.0
 				noise_by_index[i] = 26.0
 				crime_by_index[i] = 14.0 + (1.0 - _service_norm("police")) * 18.0
@@ -435,7 +461,7 @@ func _run_sim_step() -> void:
 			var policy_id: String = get_district_policy(district_id)
 			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
 			var zone_service_mult: float = _zone_service_multiplier(zone)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id)
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -452,14 +478,18 @@ func _run_sim_step() -> void:
 				job_capacity += max(1, job_cap)
 
 			var tile_output := (float(level) * 4.0) + 3.0
-			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id)
-			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id)
+			var district_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
+			var live_upkeep_hook: float = clamp(1.0 + commute_penalty * 0.35 + (1.0 - zone_service_mult) * 0.28, 0.85, 1.7)
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id)
+			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id)
 			service_upkeep_cost += _zone_service_cost(zone)
 			stat["level_sum"] = int(stat["level_sum"]) + level
 			stat["traffic_penalty_sum"] = float(stat["traffic_penalty_sum"]) + commute_penalty
 			stat["traffic_samples"] = int(stat["traffic_samples"]) + 1
 			stat["service_penalty_sum"] = float(stat["service_penalty_sum"]) + (1.0 - zone_service_mult)
 			stat["service_samples"] = int(stat["service_samples"]) + 1
+			stat["upkeep_load_sum"] = float(stat["upkeep_load_sum"]) + live_upkeep_hook
+			stat["upkeep_samples"] = int(stat["upkeep_samples"]) + 1
 			district_stats[district_id] = stat
 			penalty_sum += commute_penalty
 			penalty_count += 1
@@ -486,11 +516,11 @@ func _run_sim_step() -> void:
 				0.0, 100.0
 			)
 			noise_by_index[i] = clamp(
-				noise_base + commute_penalty * 26.0 + (1.0 - sanitation_norm) * 12.0 + (1.0 - transit_norm) * 6.0,
+				noise_base + commute_penalty * 26.0 + (1.0 - sanitation_norm) * 12.0 + (1.0 - transit_norm) * 6.0 + _event_noise_bonus(district_id),
 				0.0, 100.0
 			)
 			crime_by_index[i] = clamp(
-				16.0 + (1.0 - police_norm) * 44.0 + (1.0 - fire_norm) * 10.0 + commute_penalty * 18.0,
+				16.0 + (1.0 - police_norm) * 44.0 + (1.0 - fire_norm) * 10.0 + commute_penalty * 18.0 + _event_crime_bonus(district_id),
 				0.0, 100.0
 			)
 			land_sum += land_value_by_index[i]
@@ -515,6 +545,8 @@ func _run_sim_step() -> void:
 	avg_noise = 0.0 if metric_samples == 0 else noise_sum / float(metric_samples)
 	avg_crime = 0.0 if metric_samples == 0 else crime_sum / float(metric_samples)
 	sim_tick += 1
+	_rebuild_district_upkeep_hooks(district_stats)
+	_update_event_system(district_stats)
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
 	_update_active_alerts()
@@ -709,10 +741,16 @@ func reset_grid() -> void:
 	avg_land_value = 0.0
 	avg_noise = 0.0
 	avg_crime = 0.0
+	district_upkeep_hook_map.clear()
 	service_levels["police"] = 55.0
 	service_levels["fire"] = 55.0
 	service_levels["sanitation"] = 55.0
 	service_levels["transit"] = 55.0
+	active_event_id = ""
+	active_event_district = ""
+	active_event_ticks_left = 0
+	event_cooldown_ticks = 0
+	recent_events.clear()
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_tick = 0
@@ -805,7 +843,9 @@ func _ensure_district_stat(stats: Dictionary, district_id: String) -> void:
 		"traffic_penalty_sum": 0.0,
 		"traffic_samples": 0,
 		"service_penalty_sum": 0.0,
-		"service_samples": 0
+		"service_samples": 0,
+		"upkeep_load_sum": 0.0,
+		"upkeep_samples": 0
 	}
 
 func _update_district_demand_snapshot(stats: Dictionary) -> void:
@@ -831,6 +871,7 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 		var traffic_stress: float = 0.0 if traffic_samples == 0 else float(stat["traffic_penalty_sum"]) / float(traffic_samples)
 		var service_samples: int = int(stat["service_samples"])
 		var service_stress: float = 0.0 if service_samples == 0 else float(stat["service_penalty_sum"]) / float(service_samples)
+		var upkeep_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
 		var maturity_factor: float = clamp(avg_level / 3.0, 0.0, 1.0)
 
 		var traffic_penalty_points: float = traffic_stress * 34.0
@@ -848,6 +889,8 @@ func _update_district_demand_snapshot(stats: Dictionary) -> void:
 				"demand_index": composite,
 				"traffic_stress": traffic_stress,
 				"service_stress": service_stress,
+				"upkeep_hook": upkeep_hook,
+				"active_event": _event_label_for_district(district_id),
 				"res_demand": res_demand,
 				"com_demand": com_demand,
 				"ind_demand": ind_demand
@@ -941,6 +984,164 @@ func _zone_service_cost(zone: int) -> float:
 		return 0.58 * (_service_norm("fire") + _service_norm("sanitation") + _service_norm("transit"))
 	return 0.0
 
+func _rebuild_district_upkeep_hooks(stats: Dictionary) -> void:
+	district_upkeep_hook_map.clear()
+	for district_key in stats.keys():
+		var district_id: String = String(district_key)
+		var stat: Dictionary = stats[district_id]
+		var traffic_samples: int = int(stat.get("traffic_samples", 0))
+		var service_samples: int = int(stat.get("service_samples", 0))
+		var upkeep_samples: int = int(stat.get("upkeep_samples", 0))
+		var traffic_stress: float = 0.0 if traffic_samples == 0 else float(stat.get("traffic_penalty_sum", 0.0)) / float(traffic_samples)
+		var service_stress: float = 0.0 if service_samples == 0 else float(stat.get("service_penalty_sum", 0.0)) / float(service_samples)
+		var upkeep_load: float = 1.0 if upkeep_samples == 0 else float(stat.get("upkeep_load_sum", 0.0)) / float(upkeep_samples)
+		var hook: float = clamp(0.88 + upkeep_load * 0.12 + traffic_stress * 0.28 + service_stress * 0.26, 0.8, 1.6)
+		district_upkeep_hook_map[district_id] = hook
+
+func _update_event_system(stats: Dictionary) -> void:
+	if active_event_id != "":
+		active_event_ticks_left -= 1
+		if active_event_ticks_left <= 0:
+			_record_event(active_event_id, active_event_district, "ended")
+			active_event_id = ""
+			active_event_district = ""
+			active_event_ticks_left = 0
+			event_cooldown_ticks = 6
+		return
+
+	if event_cooldown_ticks > 0:
+		event_cooldown_ticks -= 1
+		return
+
+	if sim_tick < 18:
+		return
+	if stats.is_empty():
+		return
+	if sim_rng.randf() > 0.055:
+		return
+
+	var district_candidates: Array[String] = []
+	for key in stats.keys():
+		district_candidates.append(String(key))
+	if district_candidates.is_empty():
+		return
+
+	var target_district := district_candidates[sim_rng.randi_range(0, district_candidates.size() - 1)]
+	var event_pool := [EVENT_BLACKOUT, EVENT_STRIKE, EVENT_HEATWAVE]
+	active_event_id = String(event_pool[sim_rng.randi_range(0, event_pool.size() - 1)])
+	active_event_district = target_district
+	active_event_ticks_left = int(EVENT_BASE_DURATION.get(active_event_id, 8))
+	_record_event(active_event_id, active_event_district, "started")
+
+func _record_event(event_id: String, district_id: String, state: String) -> void:
+	recent_events.append(
+		{
+			"tick": sim_tick,
+			"event_id": event_id,
+			"event_title": String(EVENT_TITLES.get(event_id, event_id.capitalize())),
+			"district_id": district_id,
+			"state": state
+		}
+	)
+	while recent_events.size() > MAX_EVENT_HISTORY:
+		recent_events.remove_at(0)
+
+func _event_applies_to_district(district_id: String) -> bool:
+	if active_event_id == "":
+		return false
+	if district_id == "":
+		return false
+	return district_id == active_event_district
+
+func _event_growth_multiplier(zone: int, district_id: String) -> float:
+	if not _event_applies_to_district(district_id):
+		return 1.0
+	if active_event_id == EVENT_BLACKOUT:
+		return 0.76 if zone == Tool.COMMERCIAL else 0.88
+	if active_event_id == EVENT_STRIKE:
+		return 0.78 if zone in [Tool.RESIDENTIAL, Tool.COMMERCIAL] else 0.9
+	if active_event_id == EVENT_HEATWAVE:
+		return 0.86
+	return 1.0
+
+func _event_tax_multiplier(district_id: String) -> float:
+	if not _event_applies_to_district(district_id):
+		return 1.0
+	if active_event_id == EVENT_BLACKOUT:
+		return 0.82
+	if active_event_id == EVENT_STRIKE:
+		return 0.84
+	if active_event_id == EVENT_HEATWAVE:
+		return 0.9
+	return 1.0
+
+func _event_upkeep_multiplier(district_id: String) -> float:
+	if not _event_applies_to_district(district_id):
+		return 1.0
+	if active_event_id == EVENT_BLACKOUT:
+		return 1.32
+	if active_event_id == EVENT_STRIKE:
+		return 1.25
+	if active_event_id == EVENT_HEATWAVE:
+		return 1.22
+	return 1.0
+
+func _event_noise_bonus(district_id: String) -> float:
+	if not _event_applies_to_district(district_id):
+		return 0.0
+	if active_event_id == EVENT_STRIKE:
+		return 9.0
+	if active_event_id == EVENT_HEATWAVE:
+		return 6.0
+	return 0.0
+
+func _event_crime_bonus(district_id: String) -> float:
+	if not _event_applies_to_district(district_id):
+		return 0.0
+	if active_event_id == EVENT_BLACKOUT:
+		return 15.0
+	if active_event_id == EVENT_STRIKE:
+		return 8.0
+	if active_event_id == EVENT_HEATWAVE:
+		return 5.0
+	return 0.0
+
+func _event_label_for_district(district_id: String) -> String:
+	if not _event_applies_to_district(district_id):
+		return "None"
+	return String(EVENT_TITLES.get(active_event_id, active_event_id.capitalize()))
+
+func _average_upkeep_hook() -> float:
+	if district_upkeep_hook_map.is_empty():
+		return 1.0
+	var sum := 0.0
+	for key in district_upkeep_hook_map.keys():
+		sum += float(district_upkeep_hook_map[key])
+	return sum / float(max(district_upkeep_hook_map.size(), 1))
+
+func get_event_snapshot() -> Dictionary:
+	return {
+		"active_event_id": active_event_id,
+		"active_event_title": String(EVENT_TITLES.get(active_event_id, "None")) if active_event_id != "" else "None",
+		"active_event_district": active_event_district,
+		"ticks_left": active_event_ticks_left,
+		"cooldown_ticks": event_cooldown_ticks,
+		"recent_events": recent_events.duplicate(true)
+	}
+
+func trigger_random_event() -> bool:
+	if active_event_id != "":
+		return false
+	if district_demand_snapshot.is_empty():
+		return false
+	var target_district: String = String(district_demand_snapshot[sim_rng.randi_range(0, district_demand_snapshot.size() - 1)].get("district_id", "outer_borough_mix"))
+	var event_pool := [EVENT_BLACKOUT, EVENT_STRIKE, EVENT_HEATWAVE]
+	active_event_id = String(event_pool[sim_rng.randi_range(0, event_pool.size() - 1)])
+	active_event_district = target_district
+	active_event_ticks_left = int(EVENT_BASE_DURATION.get(active_event_id, 8))
+	_record_event(active_event_id, active_event_district, "started")
+	return true
+
 func export_state() -> Dictionary:
 	return {
 		"columns": columns,
@@ -958,10 +1159,15 @@ func export_state() -> Dictionary:
 		"land_value_by_index": land_value_by_index.duplicate(),
 		"noise_by_index": noise_by_index.duplicate(),
 		"crime_by_index": crime_by_index.duplicate(),
-		"district_policy_map": district_policy_map.duplicate(true)
-		,
+		"district_policy_map": district_policy_map.duplicate(true),
+		"district_upkeep_hook_map": district_upkeep_hook_map.duplicate(true),
 		"service_levels": service_levels.duplicate(true),
 		"overlay_mode": overlay_mode,
+		"active_event_id": active_event_id,
+		"active_event_district": active_event_district,
+		"active_event_ticks_left": active_event_ticks_left,
+		"event_cooldown_ticks": event_cooldown_ticks,
+		"recent_events": recent_events.duplicate(true),
 		"sim_speed": sim_speed,
 		"sim_paused": sim_paused,
 		"sim_tick": sim_tick,
@@ -986,7 +1192,9 @@ func import_state(state: Dictionary) -> bool:
 	var noise_v: Variant = state.get("noise_by_index", [])
 	var crime_v: Variant = state.get("crime_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
+	var upkeep_hooks_v: Variant = state.get("district_upkeep_hook_map", {})
 	var services_v: Variant = state.get("service_levels", {})
+	var recent_events_v: Variant = state.get("recent_events", [])
 	var history_v: Variant = state.get("economy_history", [])
 
 	if typeof(zones_v) != TYPE_ARRAY:
@@ -1007,7 +1215,11 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if typeof(policies_v) != TYPE_DICTIONARY:
 		return false
+	if typeof(upkeep_hooks_v) != TYPE_DICTIONARY:
+		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
+		return false
+	if typeof(recent_events_v) != TYPE_ARRAY:
 		return false
 	if typeof(history_v) != TYPE_ARRAY:
 		return false
@@ -1058,6 +1270,7 @@ func import_state(state: Dictionary) -> bool:
 		crime_by_index.append(float(crime_values[i]))
 
 	district_policy_map = Dictionary(policies_v).duplicate(true)
+	district_upkeep_hook_map = Dictionary(upkeep_hooks_v).duplicate(true)
 	var service_dict: Dictionary = Dictionary(services_v)
 	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
@@ -1066,6 +1279,23 @@ func import_state(state: Dictionary) -> bool:
 	overlay_mode = String(state.get("overlay_mode", OVERLAY_NONE))
 	if overlay_mode not in [OVERLAY_NONE, OVERLAY_LAND_VALUE, OVERLAY_NOISE, OVERLAY_CRIME]:
 		overlay_mode = OVERLAY_NONE
+	active_event_id = String(state.get("active_event_id", ""))
+	active_event_district = String(state.get("active_event_district", ""))
+	active_event_ticks_left = int(state.get("active_event_ticks_left", 0))
+	event_cooldown_ticks = int(state.get("event_cooldown_ticks", 0))
+	if active_event_id != "" and not EVENT_TITLES.has(active_event_id):
+		active_event_id = ""
+		active_event_district = ""
+		active_event_ticks_left = 0
+	recent_events.clear()
+	var loaded_recent_events: Array = recent_events_v
+	for event_v in loaded_recent_events:
+		if typeof(event_v) != TYPE_DICTIONARY:
+			continue
+		recent_events.append(Dictionary(event_v).duplicate(true))
+	while recent_events.size() > MAX_EVENT_HISTORY:
+		recent_events.remove_at(0)
+
 	money = int(state.get("money", 8000))
 	population = int(state.get("population", 0))
 	jobs = int(state.get("jobs", 0))
@@ -1155,6 +1385,10 @@ func get_economy_snapshot() -> Dictionary:
 		"delta_jobs": delta_jobs,
 		"housing_pressure": housing_pressure,
 		"job_pressure": job_pressure,
+		"avg_upkeep_hook": _average_upkeep_hook(),
+		"active_event_title": String(EVENT_TITLES.get(active_event_id, "None")) if active_event_id != "" else "None",
+		"active_event_district": active_event_district,
+		"event_ticks_left": active_event_ticks_left,
 		"sim_tick": sim_tick
 	}
 
@@ -1189,6 +1423,16 @@ func _update_active_alerts() -> void:
 		_push_alert("warning", "High Noise", "City-wide noise levels are elevated.")
 	if avg_crime > 52.0:
 		_push_alert("warning", "High Crime", "Crime pressure is hurting district quality.")
+	if active_event_id != "":
+		_push_alert(
+			"warning",
+			"Active Event",
+			"%s in %s (%d ticks left)." % [
+				String(EVENT_TITLES.get(active_event_id, active_event_id.capitalize())),
+				active_event_district,
+				active_event_ticks_left
+			]
+		)
 
 	if housing_pressure > 1.25:
 		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")
