@@ -75,6 +75,8 @@ var sim_tick := 0
 const MAX_HISTORY := 90
 var active_alerts: Array[Dictionary] = []
 var positive_cashflow_streak := 0
+var objectives_complete := false
+var objectives_complete_tick := -1
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -406,6 +408,8 @@ func reset_grid() -> void:
 	economy_history.clear()
 	active_alerts.clear()
 	positive_cashflow_streak = 0
+	objectives_complete = false
+	objectives_complete_tick = -1
 	sim_tick = 0
 	sim_timer = 0.0
 	sim_speed = 1.0
@@ -587,7 +591,9 @@ func export_state() -> Dictionary:
 		"sim_paused": sim_paused,
 		"sim_tick": sim_tick,
 		"economy_history": economy_history.duplicate(true),
-		"positive_cashflow_streak": positive_cashflow_streak
+		"positive_cashflow_streak": positive_cashflow_streak,
+		"objectives_complete": objectives_complete,
+		"objectives_complete_tick": objectives_complete_tick
 	}
 
 func import_state(state: Dictionary) -> bool:
@@ -658,6 +664,8 @@ func import_state(state: Dictionary) -> bool:
 	sim_paused = bool(state.get("sim_paused", false))
 	sim_tick = int(state.get("sim_tick", 0))
 	positive_cashflow_streak = int(state.get("positive_cashflow_streak", 0))
+	objectives_complete = bool(state.get("objectives_complete", false))
+	objectives_complete_tick = int(state.get("objectives_complete_tick", -1))
 	economy_history.clear()
 	var history_arr: Array = history_v
 	for point_variant in history_arr:
@@ -777,6 +785,7 @@ func get_active_alerts() -> Array[Dictionary]:
 
 func get_objective_snapshot() -> Array[Dictionary]:
 	var snapshot: Array[Dictionary] = []
+	var completed_count := 0
 	for objective_v in OBJECTIVES:
 		var objective: Dictionary = objective_v
 		var id: String = String(objective.get("id", ""))
@@ -808,4 +817,34 @@ func get_objective_snapshot() -> Array[Dictionary]:
 				"progress": progress_text
 			}
 		)
+		if complete:
+			completed_count += 1
+
+	var just_completed := false
+	if completed_count == OBJECTIVES.size() and not objectives_complete:
+		objectives_complete = true
+		objectives_complete_tick = sim_tick
+		just_completed = true
+	elif completed_count < OBJECTIVES.size() and objectives_complete:
+		objectives_complete = false
+		objectives_complete_tick = -1
+
+	snapshot.append(
+		{
+			"id": "__meta__",
+			"title": "meta",
+			"complete": objectives_complete,
+			"progress": "%d/%d" % [completed_count, OBJECTIVES.size()],
+			"completed_count": completed_count,
+			"total_count": OBJECTIVES.size(),
+			"just_completed": just_completed,
+			"complete_tick": objectives_complete_tick
+		}
+	)
 	return snapshot
+
+func is_objectives_complete() -> bool:
+	return objectives_complete
+
+func get_objectives_complete_tick() -> int:
+	return objectives_complete_tick

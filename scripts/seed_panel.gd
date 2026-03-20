@@ -22,8 +22,12 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
 @onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
 @onready var econ_pressure: Label = $EconomyPanel/VBox/EconPressure
+@onready var objective_summary: Label = $ObjectivesPanel/VBox/ObjectiveSummary
 @onready var objective_rows: VBoxContainer = $ObjectivesPanel/VBox/ObjectiveRows
 @onready var alert_rows: VBoxContainer = $AlertsPanel/VBox/AlertRows
+@onready var milestone_banner: PanelContainer = $MilestoneBanner
+@onready var milestone_banner_text: Label = $MilestoneBanner/VBox/BannerText
+@onready var milestone_banner_sub: Label = $MilestoneBanner/VBox/BannerSub
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
 @onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
@@ -42,6 +46,7 @@ var focused_row_data: Dictionary = {}
 var autosave_timer := 0.0
 var autosave_next_slot := 1
 const AUTOSAVE_INTERVAL := 20.0
+var banner_acknowledged := false
 
 const DISTRICT_NAMES := {
 	"midtown_core": "Midtown",
@@ -86,6 +91,7 @@ func _ready() -> void:
 	policy_growth_button.pressed.connect(_on_set_policy.bind("growth"))
 	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
 	popup_panel.visible = false
+	milestone_banner.visible = false
 	_init_slot_ui()
 	_refresh_economy()
 	_refresh_objectives()
@@ -365,6 +371,10 @@ func _refresh_objectives() -> void:
 		if typeof(objective_v) != TYPE_DICTIONARY:
 			continue
 		var objective: Dictionary = objective_v
+		var id: String = String(objective.get("id", ""))
+		if id == "__meta__":
+			_update_objective_meta(objective)
+			continue
 		var title: String = String(objective.get("title", "Objective"))
 		var progress: String = String(objective.get("progress", ""))
 		var complete: bool = bool(objective.get("complete", false))
@@ -373,6 +383,27 @@ func _refresh_objectives() -> void:
 		label.text = "%s %s (%s)" % ["[x]" if complete else "[ ]", title, progress]
 		label.modulate = Color(0.60, 0.89, 0.65, 0.98) if complete else Color(0.76, 0.82, 0.93, 0.98)
 		objective_rows.add_child(label)
+
+func _update_objective_meta(meta: Dictionary) -> void:
+	var completed: int = int(meta.get("completed_count", 0))
+	var total: int = int(meta.get("total_count", 0))
+	var is_complete: bool = bool(meta.get("complete", false))
+	var just_completed: bool = bool(meta.get("just_completed", false))
+	var complete_tick: int = int(meta.get("complete_tick", -1))
+
+	objective_summary.text = "Progress: %d / %d complete" % [completed, total]
+	objective_summary.modulate = Color(0.60, 0.89, 0.65, 0.98) if is_complete else Color(0.76, 0.82, 0.93, 0.98)
+
+	if just_completed:
+		banner_acknowledged = false
+	if is_complete and not banner_acknowledged:
+		milestone_banner_text.text = "City Milestone Complete"
+		milestone_banner_sub.text = "All objectives achieved at tick %d." % complete_tick
+		milestone_banner.visible = true
+		banner_acknowledged = true
+	elif not is_complete:
+		milestone_banner.visible = false
+		banner_acknowledged = false
 
 func _refresh_alerts() -> void:
 	if city_grid == null:

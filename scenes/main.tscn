@@ -175,6 +175,10 @@ layout_mode = 2
 layout_mode = 2
 text = "Objectives"
 
+[node name="ObjectiveSummary" type="Label" parent="SeedPanel/ObjectivesPanel/VBox"]
+layout_mode = 2
+text = "Progress: 0 / 4 complete"
+
 [node name="ObjectiveRows" type="VBoxContainer" parent="SeedPanel/ObjectivesPanel/VBox"]
 layout_mode = 2
 
@@ -218,3 +222,21 @@ text = "Profit"
 [node name="ClosePopupButton" type="Button" parent="SeedPanel/DistrictPopup/VBox"]
 layout_mode = 2
 text = "Close"
+
+[node name="MilestoneBanner" type="PanelContainer" parent="SeedPanel"]
+offset_left = 676.0
+offset_top = 14.0
+offset_right = 980.0
+offset_bottom = 130.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/MilestoneBanner"]
+layout_mode = 2
+
+[node name="BannerText" type="Label" parent="SeedPanel/MilestoneBanner/VBox"]
+layout_mode = 2
+text = "City Milestone Complete"
+
+[node name="BannerSub" type="Label" parent="SeedPanel/MilestoneBanner/VBox"]
+layout_mode = 2
+text = "All objectives achieved."
