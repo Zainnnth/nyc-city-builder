@@ -203,4 +203,4 @@ python tools/pipeline/scripts/segment_districts.py \
 2. Difficulty scaling by district era/theme progression.
 3. Save migration/versioning hardening for future schema changes.
 4. Optional benchmark scene for large-grid perf telemetry.
-5. Building asset pipeline (licensed sources, procedural massing, landmark pack, cel-shaded integration).
+5. Real landmark mesh pack (`.glb`) replacing placeholder scene assets.

@@ -27,6 +27,21 @@ This pipeline is for collecting and transforming NYC building data from permitte
 3. Run district segmentation:
    - `python tools/pipeline/scripts/segment_districts.py --input data/processed/buildings_normalized.geojson --districts tools/pipeline/config/district_profiles.json --out data/processed/buildings_districted.geojson`
 
+## Schema Mapping Options
+
+`ingest_buildings.py` supports common NYC field variants with configurable key maps:
+
+- `--id-keys` default: `id,building_id,bin,bbl`
+- `--height-keys` default: `height_m,height,bldgheight,heightroof,measured_height`
+- `--floor-keys` default: `numfloors,floors,stories,stories_total`
+- `--year-keys` default: `yearbuilt,year_built,yearbuilt_1,built_year`
+- `--land-use-keys` default: `landuse,land_use,land_use1,primary_use,buildingclass`
+- `--height-unit` choices: `meters` or `feet`
+
+Example using feet-based source heights:
+
+`python tools/pipeline/scripts/ingest_buildings.py --input data/raw/buildings.geojson --source-id nyc_open_data --dataset-name mappluto_2025q4 --license-id NYC_OPEN_DATA --height-unit feet --out data/processed/buildings_normalized.geojson`
+
 ## Notes
 
 - Current scripts use Python standard library only.

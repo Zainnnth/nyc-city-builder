@@ -61,23 +61,72 @@ def polygon_centroid(coords: list[list[float]]) -> tuple[float, float]:
     return (lon_sum / count, lat_sum / count)
 
 
-def extract_height_meters(props: dict[str, Any]) -> float:
-    candidates = ["height_m", "height", "bldgheight", "numfloors"]
-    for key in candidates:
+def multipolygon_centroid(coords: list[Any]) -> tuple[float, float]:
+    if not coords:
+        return (0.0, 0.0)
+    first_poly = coords[0]
+    if not isinstance(first_poly, list):
+        return (0.0, 0.0)
+    return polygon_centroid(first_poly)
+
+
+def point_centroid(coords: list[float]) -> tuple[float, float]:
+    if len(coords) < 2:
+        return (0.0, 0.0)
+    return (float(coords[0]), float(coords[1]))
+
+
+def as_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def first_existing(props: dict[str, Any], keys: list[str]) -> Any:
+    for key in keys:
+        if key in props and props[key] not in [None, ""]:
+            return props[key]
+    return None
+
+
+def extract_height_meters(props: dict[str, Any], height_keys: list[str], floor_keys: list[str], unit_hint: str) -> float:
+    for key in height_keys:
         if key not in props:
             continue
-        raw = props[key]
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
+        value = as_float(props[key])
+        if value is None:
             continue
-        if key == "numfloors":
-            return max(0.0, value * 3.2)
+        if unit_hint == "feet":
+            value *= 0.3048
         return max(0.0, value)
+
+    for key in floor_keys:
+        if key not in props:
+            continue
+        value = as_float(props[key])
+        if value is None:
+            continue
+        return max(0.0, value * 3.2)
+
     return 12.0
 
 
-def normalize_feature(feature: dict[str, Any], idx: int) -> dict[str, Any]:
+def parse_keys_csv(raw: str) -> list[str]:
+    items = [item.strip() for item in raw.split(",")]
+    return [item for item in items if item]
+
+
+def normalize_feature(
+    feature: dict[str, Any],
+    idx: int,
+    id_keys: list[str],
+    height_keys: list[str],
+    floor_keys: list[str],
+    year_keys: list[str],
+    land_use_keys: list[str],
+    unit_hint: str,
+) -> dict[str, Any] | None:
     geom = feature.get("geometry") or {}
     props = feature.get("properties") or {}
     geom_type = geom.get("type")
@@ -88,11 +137,19 @@ def normalize_feature(feature: dict[str, Any], idx: int) -> dict[str, Any]:
     if geom_type == "Polygon":
         centroid_lon, centroid_lat = polygon_centroid(coords)
     elif geom_type == "MultiPolygon" and coords:
-        centroid_lon, centroid_lat = polygon_centroid(coords[0])
+        centroid_lon, centroid_lat = multipolygon_centroid(coords)
+    elif geom_type == "Point":
+        centroid_lon, centroid_lat = point_centroid(coords)
+    else:
+        # Preserve pipeline progress by skipping unsupported geometry instead of failing entire ingest.
+        return None
 
-    source_id = str(props.get("id") or props.get("building_id") or f"feature_{idx}")
-    height_m = extract_height_meters(props)
+    source_id_raw = first_existing(props, id_keys)
+    source_id = str(source_id_raw if source_id_raw is not None else f"feature_{idx}")
+    height_m = extract_height_meters(props, height_keys, floor_keys, unit_hint)
     approx_floors = max(1, int(round(height_m / 3.2)))
+    year_built = first_existing(props, year_keys)
+    land_use = first_existing(props, land_use_keys)
 
     return {
         "type": "Feature",
@@ -101,8 +158,8 @@ def normalize_feature(feature: dict[str, Any], idx: int) -> dict[str, Any]:
             "building_id": source_id,
             "height_m": round(height_m, 2),
             "approx_floors": approx_floors,
-            "year_built": props.get("yearbuilt") or props.get("year_built"),
-            "land_use": props.get("landuse") or props.get("land_use"),
+            "year_built": year_built,
+            "land_use": land_use,
             "centroid_lon": round(centroid_lon, 7),
             "centroid_lat": round(centroid_lat, 7),
             "district_id": None,
@@ -166,6 +223,37 @@ def main() -> None:
         default=Path("data/provenance/provenance_log.csv"),
         help="CSV file for provenance append.",
     )
+    parser.add_argument(
+        "--id-keys",
+        default="id,building_id,bin,bbl",
+        help="Comma-separated property keys to resolve building ID.",
+    )
+    parser.add_argument(
+        "--height-keys",
+        default="height_m,height,bldgheight,heightroof,measured_height",
+        help="Comma-separated property keys to resolve height.",
+    )
+    parser.add_argument(
+        "--floor-keys",
+        default="numfloors,floors,stories,stories_total",
+        help="Comma-separated property keys to resolve floors fallback.",
+    )
+    parser.add_argument(
+        "--year-keys",
+        default="yearbuilt,year_built,yearbuilt_1,built_year",
+        help="Comma-separated property keys to resolve year built.",
+    )
+    parser.add_argument(
+        "--land-use-keys",
+        default="landuse,land_use,land_use1,primary_use,buildingclass",
+        help="Comma-separated property keys to resolve land use.",
+    )
+    parser.add_argument(
+        "--height-unit",
+        choices=["meters", "feet"],
+        default="meters",
+        help="Unit hint for the height fields.",
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -178,7 +266,30 @@ def main() -> None:
 
     geojson = load_json(args.input)
     features = geojson.get("features", [])
-    normalized = [normalize_feature(feature, idx) for idx, feature in enumerate(features)]
+    id_keys = parse_keys_csv(args.id_keys)
+    height_keys = parse_keys_csv(args.height_keys)
+    floor_keys = parse_keys_csv(args.floor_keys)
+    year_keys = parse_keys_csv(args.year_keys)
+    land_use_keys = parse_keys_csv(args.land_use_keys)
+
+    normalized: list[dict[str, Any]] = []
+    skipped = 0
+    for idx, feature in enumerate(features):
+        normalized_feature = normalize_feature(
+            feature,
+            idx,
+            id_keys,
+            height_keys,
+            floor_keys,
+            year_keys,
+            land_use_keys,
+            args.height_unit,
+        )
+        if normalized_feature is None:
+            skipped += 1
+            continue
+        normalized.append(normalized_feature)
+
     payload = {"type": "FeatureCollection", "features": normalized}
     save_json(args.out, payload)
 
@@ -192,6 +303,7 @@ def main() -> None:
     )
 
     print(f"Normalized {len(normalized)} building features -> {args.out}")
+    print(f"Skipped {skipped} unsupported features.")
     print(f"Provenance appended -> {args.provenance_log}")
 
 
