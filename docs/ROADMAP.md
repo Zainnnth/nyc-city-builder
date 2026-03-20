@@ -63,7 +63,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 
 ## Phase 7 - Building Asset Pipeline
 
-- [ ] Asset source policy and license allowlist (no Google Earth extraction)
+- [x] Asset source policy and license allowlist (no Google Earth extraction)
 - [ ] NYC building dataset ingest for footprint + height + district tagging
 - [ ] Procedural massing generator (footprint -> lowpoly mesh kit) for fast coverage
 - [ ] Hand-authored landmark pack (hero buildings) with LODs

@@ -37,6 +37,7 @@ A change is ready only if:
 
 ## Suggested Next Backlog
 
+- Asset source policy + ingest checklist adoption in daily workflow.
 - Goal-card completion conditions integrated into objective system.
 - Difficulty scaling pass (era-themed progression pressure).
 - Save migration/versioning compatibility tests.

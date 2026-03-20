@@ -162,6 +162,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - Pipeline docs: `tools/pipeline/README.md`
 - Policy config: `tools/pipeline/config/source_policies.json`
 - District config: `tools/pipeline/config/district_profiles.json`
+- Asset source policy: `docs/ASSET_POLICY.md`
+- Asset ingest checklist: `docs/ASSET_INGEST_CHECKLIST.md`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:
