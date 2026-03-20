@@ -82,6 +82,9 @@ var active_alerts: Array[Dictionary] = []
 var positive_cashflow_streak := 0
 var objectives_complete := false
 var objectives_complete_tick := -1
+var road_cluster_count := 0
+var largest_road_cluster := 0
+var road_efficiency := 1.0
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -243,6 +246,7 @@ func _draw_hud(map_size: Vector2) -> void:
 	var sim_text := "Connected Zones - Res: %d  Com: %d  Ind: %d" % [
 		connected_residential, connected_commercial, connected_industrial
 	]
+	sim_text += "   |   Roads: %d clusters   |   Efficiency: %.2f" % [road_cluster_count, road_efficiency]
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(16, map_size.y + 64),
@@ -308,6 +312,13 @@ func _run_sim_step() -> void:
 	var zone_upkeep_cost := 0.0
 	var tax_income_raw := 0.0
 	var district_stats := {}
+	var road_graph: Dictionary = _build_road_graph_metrics()
+	var component_by_index: Array = road_graph.get("component_by_index", [])
+	var component_sizes: Array = road_graph.get("component_sizes", [])
+	var road_count: int = int(road_graph.get("road_count", 0))
+	road_cluster_count = int(road_graph.get("component_count", 0))
+	largest_road_cluster = int(road_graph.get("largest_cluster", 0))
+	road_efficiency = 1.0 if road_count <= 0 else float(largest_road_cluster) / float(road_count)
 
 	connected_residential = 0
 	connected_commercial = 0
@@ -327,7 +338,8 @@ func _run_sim_step() -> void:
 				building_level_by_index[i] = 0
 				continue
 
-			var connected := _is_adjacent_to_road(cell)
+			var adjacent_component: int = _adjacent_road_component(cell, component_by_index)
+			var connected := adjacent_component != -1
 			var district_id: String = district_id_by_index[i]
 			_ensure_district_stat(district_stats, district_id)
 			var stat: Dictionary = district_stats[district_id]
@@ -344,7 +356,8 @@ func _run_sim_step() -> void:
 			var level := building_level_by_index[i]
 			var style_profile: String = style_profile_by_index[i]
 			var policy_id: String = get_district_policy(district_id)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id)
+			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes)
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -397,6 +410,86 @@ func _is_adjacent_to_road(cell: Vector2i) -> bool:
 			return true
 	return false
 
+func _build_road_graph_metrics() -> Dictionary:
+	var total_cells := columns * rows
+	var component_by_index: Array[int] = []
+	component_by_index.resize(total_cells)
+	for i in range(total_cells):
+		component_by_index[i] = -1
+
+	var component_sizes: Array[int] = []
+	var component_count := 0
+	var road_count := 0
+	var largest_cluster := 0
+
+	for y in range(rows):
+		for x in range(columns):
+			var cell := Vector2i(x, y)
+			var idx := _to_index(cell)
+			if not road_by_index[idx]:
+				continue
+			road_count += 1
+			if component_by_index[idx] != -1:
+				continue
+
+			var size := _flood_fill_road_component(cell, component_count, component_by_index)
+			component_sizes.append(size)
+			largest_cluster = max(largest_cluster, size)
+			component_count += 1
+
+	return {
+		"component_by_index": component_by_index,
+		"component_sizes": component_sizes,
+		"component_count": component_count,
+		"largest_cluster": largest_cluster,
+		"road_count": road_count
+	}
+
+func _flood_fill_road_component(start_cell: Vector2i, component_id: int, component_by_index: Array[int]) -> int:
+	var stack: Array[Vector2i] = [start_cell]
+	var size := 0
+	while not stack.is_empty():
+		var cell: Vector2i = stack.pop_back()
+		if not _is_in_bounds(cell):
+			continue
+		var idx := _to_index(cell)
+		if not road_by_index[idx]:
+			continue
+		if component_by_index[idx] != -1:
+			continue
+
+		component_by_index[idx] = component_id
+		size += 1
+		stack.append(cell + Vector2i(1, 0))
+		stack.append(cell + Vector2i(-1, 0))
+		stack.append(cell + Vector2i(0, 1))
+		stack.append(cell + Vector2i(0, -1))
+	return size
+
+func _adjacent_road_component(cell: Vector2i, component_by_index: Array) -> int:
+	var neighbors := [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1)
+	]
+	for dir in neighbors:
+		var n: Vector2i = cell + dir
+		if not _is_in_bounds(n):
+			continue
+		var idx := _to_index(n)
+		if road_by_index[idx]:
+			return int(component_by_index[idx])
+	return -1
+
+func _road_commute_multiplier(component_id: int, component_sizes: Array) -> float:
+	if component_id < 0 or component_id >= component_sizes.size():
+		return 0.75
+	var size := int(component_sizes[component_id])
+	if size <= 0:
+		return 0.75
+	return clamp(float(size) / 40.0, 0.5, 1.25)
+
 func _init_tiles() -> void:
 	zone_by_index.clear()
 	road_by_index.clear()
@@ -432,6 +525,9 @@ func reset_grid() -> void:
 	positive_cashflow_streak = 0
 	objectives_complete = false
 	objectives_complete_tick = -1
+	road_cluster_count = 0
+	largest_road_cluster = 0
+	road_efficiency = 1.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_tick = 0
@@ -703,6 +799,9 @@ func import_state(state: Dictionary) -> bool:
 	connected_commercial = 0
 	connected_industrial = 0
 	district_demand_snapshot.clear()
+	road_cluster_count = 0
+	largest_road_cluster = 0
+	road_efficiency = 1.0
 	undo_stack.clear()
 	redo_stack.clear()
 	sim_timer = 0.0
@@ -780,6 +879,8 @@ func _update_active_alerts() -> void:
 		_push_alert("warning", "No Housing Growth", "No connected residential zones.")
 	if connected_commercial + connected_industrial == 0:
 		_push_alert("warning", "No Employment Growth", "No connected job zones.")
+	if road_cluster_count > 3 and road_efficiency < 0.55:
+		_push_alert("warning", "Fragmented Roads", "Road network is split into many clusters.")
 
 	if housing_pressure > 1.25:
 		_push_alert("warning", "Housing Pressure", "Jobs are outpacing residents.")
@@ -874,6 +975,13 @@ func is_objectives_complete() -> bool:
 
 func get_objectives_complete_tick() -> int:
 	return objectives_complete_tick
+
+func get_road_metrics() -> Dictionary:
+	return {
+		"cluster_count": road_cluster_count,
+		"largest_cluster": largest_road_cluster,
+		"efficiency": road_efficiency
+	}
 
 func undo_edit() -> void:
 	if undo_stack.is_empty():

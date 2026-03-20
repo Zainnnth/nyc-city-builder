@@ -25,7 +25,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 
 ## Phase 2 - Systems Depth (Next)
 
-- [ ] Road connectivity graph cost model
+- [x] Road connectivity graph cost model
 - [ ] Traffic stress per district and commute penalties
 - [ ] Service layers (police/fire/sanitation/transit)
 - [ ] Land value + noise/crime overlays
