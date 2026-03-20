@@ -117,6 +117,35 @@ text = "District Demand Index"
 [node name="DemandRows" type="VBoxContainer" parent="SeedPanel/DemandPanel/VBox"]
 layout_mode = 2
 
+[node name="EconomyPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 398.0
+offset_top = 220.0
+offset_right = 664.0
+offset_bottom = 364.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/EconomyPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/EconomyPanel/VBox"]
+layout_mode = 2
+text = "Economy Snapshot"
+
+[node name="EconMoney" type="Label" parent="SeedPanel/EconomyPanel/VBox"]
+layout_mode = 2
+text = "Money: $0 (+0)"
+
+[node name="EconPopulation" type="Label" parent="SeedPanel/EconomyPanel/VBox"]
+layout_mode = 2
+text = "Population: 0 (+0)"
+
+[node name="EconJobs" type="Label" parent="SeedPanel/EconomyPanel/VBox"]
+layout_mode = 2
+text = "Jobs: 0 (+0)"
+
+[node name="EconPressure" type="Label" parent="SeedPanel/EconomyPanel/VBox"]
+layout_mode = 2
+text = "Housing P: 1.00  |  Job P: 1.00"
+
 [node name="DistrictPopup" type="PanelContainer" parent="SeedPanel"]
 offset_left = 398.0
 offset_top = 14.0

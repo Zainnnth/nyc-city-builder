@@ -18,6 +18,10 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var speed_3x_button: Button = $Panel/VBox/TimeControls/Speed3xButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
+@onready var econ_money: Label = $EconomyPanel/VBox/EconMoney
+@onready var econ_population: Label = $EconomyPanel/VBox/EconPopulation
+@onready var econ_jobs: Label = $EconomyPanel/VBox/EconJobs
+@onready var econ_pressure: Label = $EconomyPanel/VBox/EconPressure
 @onready var popup_panel: PanelContainer = $DistrictPopup
 @onready var popup_title: Label = $DistrictPopup/VBox/PopupTitle
 @onready var popup_body: Label = $DistrictPopup/VBox/PopupBody
@@ -81,12 +85,14 @@ func _ready() -> void:
 	policy_profit_button.pressed.connect(_on_set_policy.bind("profit"))
 	popup_panel.visible = false
 	_init_slot_ui()
+	_refresh_economy()
 
 func _process(delta: float) -> void:
 	ui_timer += delta
 	if ui_timer >= 0.4:
 		ui_timer = 0.0
 		_refresh_demand_bars()
+		_refresh_economy()
 		_update_time_buttons()
 	if autosave_toggle.button_pressed:
 		autosave_timer += delta
@@ -310,6 +316,31 @@ func _update_slot_labels() -> void:
 		var item_idx: int = slot - 1
 		var text: String = "Slot %d%s" % [slot, " *" if exists else ""]
 		slot_select.set_item_text(item_idx, text)
+
+func _refresh_economy() -> void:
+	if city_grid == null:
+		return
+	if not city_grid.has_method("get_economy_snapshot"):
+		return
+
+	var snap_v: Variant = city_grid.call("get_economy_snapshot")
+	if typeof(snap_v) != TYPE_DICTIONARY:
+		return
+	var snap: Dictionary = snap_v
+
+	var money: int = int(snap.get("money", 0))
+	var pop: int = int(snap.get("population", 0))
+	var jobs: int = int(snap.get("jobs", 0))
+	var d_money: int = int(snap.get("delta_money", 0))
+	var d_pop: int = int(snap.get("delta_population", 0))
+	var d_jobs: int = int(snap.get("delta_jobs", 0))
+	var housing_p: float = float(snap.get("housing_pressure", 1.0))
+	var job_p: float = float(snap.get("job_pressure", 1.0))
+
+	econ_money.text = "Money: $%d (%s%d)" % [money, "+" if d_money >= 0 else "", d_money]
+	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
+	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
+	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f" % [housing_p, job_p]
 
 func _on_pause_toggled() -> void:
 	if city_grid == null:

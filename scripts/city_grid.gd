@@ -70,6 +70,9 @@ var connected_commercial := 0
 var connected_industrial := 0
 var district_demand_snapshot: Array[Dictionary] = []
 var district_policy_map: Dictionary = {}
+var economy_history: Array[Dictionary] = []
+var sim_tick := 0
+const MAX_HISTORY := 90
 
 const DISTRICT_TINTS := {
 	"midtown_core": Color(0.98, 0.86, 0.54, 1.0),
@@ -337,6 +340,8 @@ func _run_sim_step() -> void:
 	var tax_income := int(round(population * 0.7 + jobs * 0.45 + tax_income_raw))
 	var upkeep := int(round(road_upkeep_cost + zone_upkeep_cost))
 	money += tax_income - upkeep
+	sim_tick += 1
+	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
@@ -383,6 +388,8 @@ func reset_grid() -> void:
 	connected_industrial = 0
 	district_demand_snapshot.clear()
 	district_policy_map.clear()
+	economy_history.clear()
+	sim_tick = 0
 	sim_timer = 0.0
 	sim_speed = 1.0
 	sim_paused = false
@@ -560,7 +567,9 @@ func export_state() -> Dictionary:
 		"district_policy_map": district_policy_map.duplicate(true)
 		,
 		"sim_speed": sim_speed,
-		"sim_paused": sim_paused
+		"sim_paused": sim_paused,
+		"sim_tick": sim_tick,
+		"economy_history": economy_history.duplicate(true)
 	}
 
 func import_state(state: Dictionary) -> bool:
@@ -575,6 +584,7 @@ func import_state(state: Dictionary) -> bool:
 	var districts_v: Variant = state.get("district_id_by_index", [])
 	var styles_v: Variant = state.get("style_profile_by_index", [])
 	var policies_v: Variant = state.get("district_policy_map", {})
+	var history_v: Variant = state.get("economy_history", [])
 
 	if typeof(zones_v) != TYPE_ARRAY:
 		return false
@@ -587,6 +597,8 @@ func import_state(state: Dictionary) -> bool:
 	if typeof(styles_v) != TYPE_ARRAY:
 		return false
 	if typeof(policies_v) != TYPE_DICTIONARY:
+		return false
+	if typeof(history_v) != TYPE_ARRAY:
 		return false
 
 	var expected_size := columns * rows
@@ -626,6 +638,16 @@ func import_state(state: Dictionary) -> bool:
 	selected_tool = int(state.get("selected_tool", int(Tool.ROAD)))
 	sim_speed = float(state.get("sim_speed", 1.0))
 	sim_paused = bool(state.get("sim_paused", false))
+	sim_tick = int(state.get("sim_tick", 0))
+	economy_history.clear()
+	var history_arr: Array = history_v
+	for point_variant in history_arr:
+		if typeof(point_variant) != TYPE_DICTIONARY:
+			continue
+		var point: Dictionary = point_variant
+		economy_history.append(point.duplicate(true))
+	while economy_history.size() > MAX_HISTORY:
+		economy_history.remove_at(0)
 	connected_residential = 0
 	connected_commercial = 0
 	connected_industrial = 0
@@ -648,3 +670,44 @@ func is_sim_paused() -> bool:
 
 func get_sim_speed() -> float:
 	return sim_speed
+
+func _push_economy_point() -> void:
+	economy_history.append(
+		{
+			"tick": sim_tick,
+			"money": money,
+			"population": population,
+			"jobs": jobs
+		}
+	)
+	if economy_history.size() > MAX_HISTORY:
+		economy_history.remove_at(0)
+
+func get_economy_snapshot() -> Dictionary:
+	var latest_money := money
+	var latest_pop := population
+	var latest_jobs := jobs
+
+	var delta_money := 0
+	var delta_pop := 0
+	var delta_jobs := 0
+	if economy_history.size() >= 2:
+		var prev: Dictionary = economy_history[economy_history.size() - 2]
+		delta_money = latest_money - int(prev.get("money", latest_money))
+		delta_pop = latest_pop - int(prev.get("population", latest_pop))
+		delta_jobs = latest_jobs - int(prev.get("jobs", latest_jobs))
+
+	var housing_pressure: float = clamp((float(latest_jobs) + 1.0) / (float(latest_pop) + 1.0), 0.5, 2.0)
+	var job_pressure: float = clamp((float(latest_pop) + 1.0) / (float(latest_jobs) + 1.0), 0.5, 2.0)
+
+	return {
+		"money": latest_money,
+		"population": latest_pop,
+		"jobs": latest_jobs,
+		"delta_money": delta_money,
+		"delta_population": delta_pop,
+		"delta_jobs": delta_jobs,
+		"housing_pressure": housing_pressure,
+		"job_pressure": job_pressure,
+		"sim_tick": sim_tick
+	}

@@ -32,6 +32,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `Autosave` performs rolling slot saves every ~20 seconds.
   - `Load Latest` loads the newest slot by file timestamp.
   - Time controls: `Pause/Resume`, `1x`, `3x` simulation speed.
+  - Economy snapshot panel with per-tick deltas and pressure indicators.
 - Live district demand bars:
   - Shows per-district demand index and `R/C/I` demand values.
   - Updates continuously from simulation telemetry.
