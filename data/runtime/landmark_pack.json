@@ -1,0 +1,102 @@
+{
+  "landmarks": [
+    {
+      "name": "Empire State Tower Proxy",
+      "district_ids": ["midtown_core"],
+      "archetype_contains": ["tower", "glass"],
+      "min_level": 2,
+      "chance": 0.30,
+      "max_per_district": 1,
+      "priority": 90,
+      "height_mult": 2.4,
+      "roof_tint": "#f3c27f",
+      "wall_tint": "#9bb3d4",
+      "profile_overrides": {
+        "inset_px": 12.0,
+        "height_jitter": 1.5,
+        "iso_skew_x": 0.39
+      }
+    },
+    {
+      "name": "Chrysler Spire Proxy",
+      "district_ids": ["midtown_core"],
+      "archetype_contains": ["tower", "marquee"],
+      "min_level": 2,
+      "chance": 0.26,
+      "max_per_district": 1,
+      "priority": 80,
+      "height_mult": 2.1,
+      "roof_tint": "#ffd6a1",
+      "wall_tint": "#a1b4cf",
+      "profile_overrides": {
+        "inset_px": 11.0,
+        "height_jitter": 2.0
+      }
+    },
+    {
+      "name": "FiDi Crown Proxy",
+      "district_ids": ["financial_district"],
+      "archetype_contains": ["tower", "stone"],
+      "min_level": 2,
+      "chance": 0.28,
+      "max_per_district": 1,
+      "priority": 85,
+      "height_mult": 2.3,
+      "roof_tint": "#e0ba93",
+      "wall_tint": "#8ea3bf",
+      "profile_overrides": {
+        "inset_px": 12.0,
+        "height_jitter": 1.0,
+        "iso_skew_x": 0.38
+      }
+    },
+    {
+      "name": "LES Neon Hub Proxy",
+      "district_ids": ["lower_east_side"],
+      "archetype_contains": ["marquee", "bodega"],
+      "min_level": 1,
+      "chance": 0.18,
+      "max_per_district": 1,
+      "priority": 55,
+      "height_mult": 1.45,
+      "roof_tint": "#f8b690",
+      "wall_tint": "#8e9fba",
+      "profile_overrides": {
+        "inset_px": 9.0,
+        "height_jitter": 1.0
+      }
+    },
+    {
+      "name": "Harlem Cultural Hall Proxy",
+      "district_ids": ["harlem"],
+      "archetype_contains": ["cultural", "brownstone"],
+      "min_level": 1,
+      "chance": 0.20,
+      "max_per_district": 1,
+      "priority": 50,
+      "height_mult": 1.35,
+      "roof_tint": "#d9a37d",
+      "wall_tint": "#9099ab",
+      "profile_overrides": {
+        "inset_px": 9.0,
+        "height_jitter": 0.8
+      }
+    },
+    {
+      "name": "Queens Exchange Hub Proxy",
+      "district_ids": ["queens_west"],
+      "archetype_contains": ["warehouse", "conversion", "glass"],
+      "min_level": 1,
+      "chance": 0.22,
+      "max_per_district": 1,
+      "priority": 58,
+      "height_mult": 1.6,
+      "roof_tint": "#d7ae85",
+      "wall_tint": "#88a0bd",
+      "profile_overrides": {
+        "inset_px": 10.0,
+        "height_jitter": 1.1
+      }
+    }
+  ]
+}
