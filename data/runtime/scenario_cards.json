@@ -1,0 +1,76 @@
+{
+  "cards": {
+    "balanced_bootstrap": {
+      "name": "Balanced Bootstrap",
+      "summary": "Steady city start with moderate services and low volatility.",
+      "seed": 1998,
+      "balance_profile_id": "standard",
+      "policies": {
+        "midtown_core": "balanced",
+        "financial_district": "balanced",
+        "lower_east_side": "balanced",
+        "harlem": "balanced",
+        "queens_west": "balanced"
+      },
+      "service_levels": {
+        "police": 55,
+        "fire": 55,
+        "sanitation": 55,
+        "transit": 55
+      },
+      "goal_cards": [
+        "Reach population 2800 by tick 120",
+        "Stay above $35000 treasury",
+        "Keep average crime below 22"
+      ]
+    },
+    "midtown_liquidity_rush": {
+      "name": "Midtown Liquidity Rush",
+      "summary": "Finance-heavy opening with faster cash flow and higher instability.",
+      "seed": 2001,
+      "balance_profile_id": "austerity",
+      "policies": {
+        "midtown_core": "profit",
+        "financial_district": "profit",
+        "lower_east_side": "growth",
+        "harlem": "balanced",
+        "queens_west": "balanced"
+      },
+      "service_levels": {
+        "police": 48,
+        "fire": 50,
+        "sanitation": 47,
+        "transit": 62
+      },
+      "goal_cards": [
+        "Grow jobs to 2200 before tick 110",
+        "Survive one event without negative cashflow",
+        "Hold commute penalty under 0.45"
+      ]
+    },
+    "outer_borough_civic_push": {
+      "name": "Outer Borough Civic Push",
+      "summary": "Service-forward neighborhood expansion with transit focus.",
+      "seed": 1995,
+      "balance_profile_id": "civic_push",
+      "policies": {
+        "midtown_core": "balanced",
+        "financial_district": "balanced",
+        "lower_east_side": "growth",
+        "harlem": "growth",
+        "queens_west": "growth"
+      },
+      "service_levels": {
+        "police": 60,
+        "fire": 62,
+        "sanitation": 66,
+        "transit": 70
+      },
+      "goal_cards": [
+        "Reach citywide population 3200",
+        "Keep housing pressure below 1.25",
+        "Maintain service stress below 0.35 in 4 districts"
+      ]
+    }
+  }
+}

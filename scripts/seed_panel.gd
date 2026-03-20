@@ -4,6 +4,7 @@ signal district_focus_requested(target_pos: Vector2)
 
 @export var district_generator_path: NodePath = ^"../DistrictGenerator"
 @export var city_grid_path: NodePath = ^"../CityGrid"
+@export var scenario_cards_path := "res://data/runtime/scenario_cards.json"
 
 @onready var input_seed: LineEdit = $Panel/VBox/SeedRow/SeedInput
 @onready var apply_button: Button = $Panel/VBox/Controls/ApplySeedButton
@@ -20,6 +21,10 @@ signal district_focus_requested(target_pos: Vector2)
 @onready var preset_midtown_button: Button = $Panel/VBox/Presets/MidtownPresetButton
 @onready var preset_boroughs_button: Button = $Panel/VBox/Presets/BoroughPresetButton
 @onready var balance_profile_select: OptionButton = $Panel/VBox/BalanceRow/BalanceProfileSelect
+@onready var scenario_card_select: OptionButton = $ScenarioCardsPanel/VBox/ScenarioRow/ScenarioSelect
+@onready var scenario_summary: Label = $ScenarioCardsPanel/VBox/ScenarioSummary
+@onready var scenario_goals: Label = $ScenarioCardsPanel/VBox/ScenarioGoals
+@onready var apply_scenario_card_button: Button = $ScenarioCardsPanel/VBox/ApplyScenarioCardButton
 @onready var status_label: Label = $Panel/VBox/StatusLabel
 @onready var demand_rows: VBoxContainer = $DemandPanel/VBox/DemandRows
 @onready var police_slider: HSlider = $ServicesPanel/VBox/PoliceRow/PoliceSlider
@@ -72,6 +77,8 @@ const AUTOSAVE_INTERVAL := 20.0
 var banner_acknowledged := false
 var is_syncing_services := false
 var is_syncing_balance := false
+var scenario_cards: Dictionary = {}
+var scenario_card_order: Array[String] = []
 var tutorial_step_index := 0
 var tutorial_active := false
 const TUTORIAL_STATE_PATH := "user://tutorial_state.json"
@@ -175,6 +182,8 @@ func _ready() -> void:
 	preset_midtown_button.pressed.connect(_on_apply_preset.bind("midtown_boom"))
 	preset_boroughs_button.pressed.connect(_on_apply_preset.bind("borough_buildout"))
 	balance_profile_select.item_selected.connect(_on_balance_profile_selected)
+	scenario_card_select.item_selected.connect(_on_scenario_card_selected)
+	apply_scenario_card_button.pressed.connect(_on_apply_scenario_card)
 	police_slider.value_changed.connect(_on_service_changed.bind("police"))
 	fire_slider.value_changed.connect(_on_service_changed.bind("fire"))
 	sanitation_slider.value_changed.connect(_on_service_changed.bind("sanitation"))
@@ -195,6 +204,7 @@ func _ready() -> void:
 	_apply_tooltips()
 	_init_slot_ui()
 	_init_balance_profiles()
+	_init_scenario_cards()
 	_init_overlay_ui()
 	_init_tutorial()
 	_refresh_service_controls()
@@ -448,6 +458,89 @@ func _refresh_balance_profile() -> void:
 			break
 	is_syncing_balance = false
 
+func _init_scenario_cards() -> void:
+	scenario_cards = _load_scenario_cards()
+	if scenario_cards.is_empty():
+		scenario_cards = SCENARIOS.duplicate(true)
+
+	scenario_card_order.clear()
+	for card_key in scenario_cards.keys():
+		scenario_card_order.append(String(card_key))
+	scenario_card_order.sort()
+
+	scenario_card_select.clear()
+	for card_id in scenario_card_order:
+		var card_v: Variant = scenario_cards.get(card_id, {})
+		var card: Dictionary = card_v if typeof(card_v) == TYPE_DICTIONARY else {}
+		var card_name: String = String(card.get("name", card_id.capitalize()))
+		scenario_card_select.add_item(card_name, scenario_card_select.get_item_count())
+		var idx: int = scenario_card_select.get_item_count() - 1
+		scenario_card_select.set_item_metadata(idx, card_id)
+
+	if scenario_card_select.get_item_count() > 0:
+		scenario_card_select.select(0)
+	_refresh_scenario_card_preview()
+
+func _load_scenario_cards() -> Dictionary:
+	if not FileAccess.file_exists(scenario_cards_path):
+		return {}
+	var fp := FileAccess.open(scenario_cards_path, FileAccess.READ)
+	if fp == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	var payload: Dictionary = parsed
+	var cards_v: Variant = payload.get("cards", payload)
+	if typeof(cards_v) != TYPE_DICTIONARY:
+		return {}
+	var cards_dict: Dictionary = cards_v
+	var cards: Dictionary = {}
+	for key in cards_dict.keys():
+		var card_v: Variant = cards_dict.get(key, {})
+		if typeof(card_v) == TYPE_DICTIONARY:
+			cards[String(key)] = (card_v as Dictionary).duplicate(true)
+	return cards
+
+func _on_scenario_card_selected(_index: int) -> void:
+	_refresh_scenario_card_preview()
+
+func _refresh_scenario_card_preview() -> void:
+	if scenario_card_select.get_item_count() == 0:
+		scenario_summary.text = "No authored cards loaded."
+		scenario_goals.text = "Goals: Add data/runtime/scenario_cards.json."
+		return
+	var idx: int = scenario_card_select.selected
+	if idx < 0 or idx >= scenario_card_select.get_item_count():
+		idx = 0
+		scenario_card_select.select(0)
+	var card_id: String = String(scenario_card_select.get_item_metadata(idx))
+	var card_v: Variant = scenario_cards.get(card_id, {})
+	var card: Dictionary = card_v if typeof(card_v) == TYPE_DICTIONARY else {}
+	var summary: String = String(card.get("summary", "No summary provided."))
+	var goals_v: Variant = card.get("goal_cards", [])
+	var goals: Array[String] = []
+	if typeof(goals_v) == TYPE_ARRAY:
+		for goal_v in goals_v:
+			goals.append(String(goal_v))
+	scenario_summary.text = summary
+	if goals.is_empty():
+		scenario_goals.text = "Goals: Sandbox freeplay."
+	else:
+		scenario_goals.text = "Goals:\n- %s" % "\n- ".join(goals)
+
+func _on_apply_scenario_card() -> void:
+	var idx: int = scenario_card_select.selected
+	if idx < 0 or idx >= scenario_card_select.get_item_count():
+		status_label.text = "Select a scenario card first."
+		return
+	var card_id: String = String(scenario_card_select.get_item_metadata(idx))
+	var card_v: Variant = scenario_cards.get(card_id, {})
+	if typeof(card_v) != TYPE_DICTIONARY:
+		status_label.text = "Scenario card data missing."
+		return
+	_apply_scenario_payload(card_v, card_id)
+
 func _init_slot_ui() -> void:
 	slot_select.clear()
 	slot_select.add_item("Slot 1", 1)
@@ -532,6 +625,8 @@ func _apply_tooltips() -> void:
 	load_latest_button.tooltip_text = "Load most recently modified save slot."
 	autosave_toggle.tooltip_text = "Enable rolling autosaves every ~20 seconds."
 	balance_profile_select.tooltip_text = "Scenario tuning profile affecting growth/tax/upkeep/event pressure."
+	scenario_card_select.tooltip_text = "Authorable scenario cards from JSON with goals and setup parameters."
+	apply_scenario_card_button.tooltip_text = "Apply selected card seed, district policies, balance profile, and service levels."
 	pause_button.tooltip_text = "Pause or resume simulation."
 	speed_1x_button.tooltip_text = "Set simulation speed to real-time."
 	speed_3x_button.tooltip_text = "Set simulation speed to 3x."
@@ -880,27 +975,46 @@ func _on_set_speed(speed: float) -> void:
 	_update_time_buttons()
 
 func _on_apply_preset(preset_id: String) -> void:
+	if not SCENARIOS.has(preset_id):
+		status_label.text = "Preset not found."
+		return
+	var preset_v: Variant = SCENARIOS[preset_id]
+	if typeof(preset_v) != TYPE_DICTIONARY:
+		status_label.text = "Preset data invalid."
+		return
+	_apply_scenario_payload(preset_v, preset_id)
+
+func _apply_scenario_payload(payload_v: Variant, fallback_id: String) -> void:
 	if district_generator == null:
 		return
 	if city_grid == null:
 		return
-	if not SCENARIOS.has(preset_id):
-		status_label.text = "Preset not found."
+	if typeof(payload_v) != TYPE_DICTIONARY:
 		return
-
-	var preset: Dictionary = SCENARIOS[preset_id]
-	var seed: int = int(preset.get("seed", 1998))
-	var scenario_name: String = String(preset.get("name", preset_id))
+	var payload: Dictionary = payload_v
+	var seed: int = int(payload.get("seed", district_generator.call("get_world_seed")))
+	var scenario_name: String = String(payload.get("name", fallback_id))
 	input_seed.text = str(seed)
 	district_generator.call("regenerate", seed, false)
 
-	var policies_v: Variant = preset.get("policies", {})
+	var policies_v: Variant = payload.get("policies", {})
 	if typeof(policies_v) == TYPE_DICTIONARY and city_grid.has_method("set_district_policy"):
 		var policies: Dictionary = policies_v
 		for district_key in policies.keys():
 			var district_id: String = String(district_key)
-			var policy_id: String = String(policies[district_id])
+			var policy_id: String = String(policies[district_key])
 			city_grid.call("set_district_policy", district_id, policy_id)
+
+	var balance_profile_id: String = String(payload.get("balance_profile_id", ""))
+	if balance_profile_id != "" and city_grid.has_method("set_balance_profile"):
+		city_grid.call("set_balance_profile", balance_profile_id)
+
+	var services_v: Variant = payload.get("service_levels", {})
+	if typeof(services_v) == TYPE_DICTIONARY and city_grid.has_method("set_service_level"):
+		var services: Dictionary = services_v
+		for service_key in services.keys():
+			var service_id: String = String(service_key)
+			city_grid.call("set_service_level", service_id, float(services[service_key]))
 
 	if city_grid.has_method("set_sim_paused"):
 		city_grid.call("set_sim_paused", false)
@@ -910,9 +1024,11 @@ func _on_apply_preset(preset_id: String) -> void:
 	status_label.text = "Scenario loaded: %s" % scenario_name
 	_refresh_demand_bars()
 	_refresh_service_controls()
+	_refresh_balance_profile()
 	_refresh_economy()
 	_refresh_objectives()
 	_refresh_alerts()
+	_refresh_scenario_card_preview()
 	_update_time_buttons()
 
 func _update_time_buttons() -> void:
@@ -953,6 +1069,7 @@ func _apply_retro_ui_theme() -> void:
 		"OverlayPanel",
 		"EventPanel",
 		"ObjectivesPanel",
+		"ScenarioCardsPanel",
 		"DistrictPopup",
 		"MilestoneBanner",
 		"TutorialPanel"
@@ -1006,6 +1123,7 @@ func _all_buttons() -> Array[Button]:
 		preset_balanced_button,
 		preset_midtown_button,
 		preset_boroughs_button,
+		apply_scenario_card_button,
 		policy_balanced_button,
 		policy_growth_button,
 		policy_profit_button,

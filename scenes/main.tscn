@@ -437,3 +437,37 @@ text = "Next"
 [node name="TutorialSkipButton" type="Button" parent="SeedPanel/TutorialPanel/VBox/TutorialButtons"]
 layout_mode = 2
 text = "Skip"
+
+[node name="ScenarioCardsPanel" type="PanelContainer" parent="SeedPanel"]
+offset_left = 676.0
+offset_top = 530.0
+offset_right = 980.0
+offset_bottom = 732.0
+
+[node name="VBox" type="VBoxContainer" parent="SeedPanel/ScenarioCardsPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SeedPanel/ScenarioCardsPanel/VBox"]
+layout_mode = 2
+text = "Scenario Cards"
+
+[node name="ScenarioRow" type="HBoxContainer" parent="SeedPanel/ScenarioCardsPanel/VBox"]
+layout_mode = 2
+
+[node name="ScenarioSelect" type="OptionButton" parent="SeedPanel/ScenarioCardsPanel/VBox/ScenarioRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScenarioSummary" type="Label" parent="SeedPanel/ScenarioCardsPanel/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Select a scenario card to preview."
+
+[node name="ScenarioGoals" type="Label" parent="SeedPanel/ScenarioCardsPanel/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Goals:"
+
+[node name="ApplyScenarioCardButton" type="Button" parent="SeedPanel/ScenarioCardsPanel/VBox"]
+layout_mode = 2
+text = "Apply Scenario Card"

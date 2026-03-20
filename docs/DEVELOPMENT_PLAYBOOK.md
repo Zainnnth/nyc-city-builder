@@ -37,7 +37,7 @@ A change is ready only if:
 
 ## Suggested Next Backlog
 
-- Scenario authoring docs and templates.
 - Performance pass for large-grid simulation.
 - More deterministic simulation tests.
 - Release workflow with export artifacts on tags.
+- Goal-card completion conditions integrated into objective system.

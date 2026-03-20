@@ -46,3 +46,10 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Tutorial onboarding and tooltips
 - [x] Build settings and export presets
 - [x] Regression smoke checks and basic test harness
+
+## Phase 5 - Authoring and Scale
+
+- [x] Scenario authoring pack (goal cards + parameter presets)
+- [ ] Performance pass for larger grids and longer sessions
+- [ ] Release automation for tagged builds
+- [ ] Deterministic simulation assertions expansion

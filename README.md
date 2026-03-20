@@ -46,6 +46,11 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - `Balanced Preset`
     - `Midtown Boom`
     - `Borough Buildout`
+  - Scenario authoring pack:
+    - New `Scenario Cards` panel with authored setup cards
+    - Card data loaded from `data/runtime/scenario_cards.json`
+    - Cards can apply seed, district policies, balance profile, and service sliders
+    - Includes per-card goal text for run planning
   - Balance profile tuning:
     - `Standard`, `Civic Push`, `Austerity Crunch`
     - Adjusts growth/tax/upkeep/event pressure and cash objective target
@@ -163,7 +168,7 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Scenario authoring pack (goal cards + parameter presets).
-2. Performance pass for larger grids and longer sessions.
-3. Release automation to export and upload build artifacts on tags.
-4. Expanded deterministic simulation assertions in smoke harness.
+1. Performance pass for larger grids and longer sessions.
+2. Release automation to export and upload build artifacts on tags.
+3. Expanded deterministic simulation assertions in smoke harness.
+4. Goal-card win/loss validation hooks in simulation objectives.
