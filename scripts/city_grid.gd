@@ -50,12 +50,17 @@ const TOOL_KEYS := {
 
 var selected_tool: Tool = Tool.ROAD
 var is_drag_painting := false
+var stroke_capture_active := false
+var stroke_dirty := false
 
 var zone_by_index: Array[int] = []
 var road_by_index: Array[bool] = []
 var building_level_by_index: Array[int] = []
 var district_id_by_index: Array[String] = []
 var style_profile_by_index: Array[String] = []
+var undo_stack: Array[Dictionary] = []
+var redo_stack: Array[Dictionary] = []
+const MAX_EDIT_HISTORY := 60
 
 var sim_timer := 0.0
 const SIM_STEP_SECONDS := 1.0
@@ -165,6 +170,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.ctrl_pressed and event.keycode == KEY_Z:
+			undo_edit()
+			return
+		if event.ctrl_pressed and event.keycode == KEY_Y:
+			redo_edit()
+			return
 		if TOOL_KEYS.has(event.keycode):
 			selected_tool = TOOL_KEYS[event.keycode]
 			queue_redraw()
@@ -172,6 +183,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_begin_edit_stroke()
+			elif is_drag_painting:
+				_end_edit_stroke()
 			is_drag_painting = event.pressed
 			if event.pressed:
 				_paint_at_mouse_position()
@@ -239,7 +254,7 @@ func _draw_hud(map_size: Vector2) -> void:
 	)
 
 func _draw_tool_legend(map_size: Vector2) -> void:
-	var text := "1 Road  2 Res  3 Com  4 Ind  5 Bulldoze   |   LMB drag: paint   |   Arrows: pan   |   Wheel: zoom"
+	var text := "1 Road  2 Res  3 Com  4 Ind  5 Bulldoze   |   LMB drag: paint   |   Ctrl+Z/Y: Undo/Redo   |   Arrows: pan   |   Wheel: zoom"
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(16, map_size.y + 92),
@@ -260,24 +275,31 @@ func _paint_at_mouse_position() -> void:
 	match selected_tool:
 		Tool.ROAD:
 			if not road_by_index[index]:
+				_mark_edit_if_needed()
 				road_by_index[index] = true
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
 				money -= 8
+				stroke_dirty = true
 		Tool.BULLDOZE:
 			if road_by_index[index] or zone_by_index[index] != Tool.BULLDOZE or building_level_by_index[index] > 0:
+				_mark_edit_if_needed()
 				road_by_index[index] = false
 				zone_by_index[index] = Tool.BULLDOZE
 				building_level_by_index[index] = 0
 				money -= 3
+				stroke_dirty = true
 		_:
 			if zone_by_index[index] != selected_tool or road_by_index[index]:
+				_mark_edit_if_needed()
 				road_by_index[index] = false
 				zone_by_index[index] = selected_tool
 				building_level_by_index[index] = 0
 				money -= 5
+				stroke_dirty = true
 
-	queue_redraw()
+	if stroke_dirty:
+		queue_redraw()
 
 func _run_sim_step() -> void:
 	var pop_capacity := 0
@@ -410,6 +432,8 @@ func reset_grid() -> void:
 	positive_cashflow_streak = 0
 	objectives_complete = false
 	objectives_complete_tick = -1
+	undo_stack.clear()
+	redo_stack.clear()
 	sim_tick = 0
 	sim_timer = 0.0
 	sim_speed = 1.0
@@ -679,6 +703,8 @@ func import_state(state: Dictionary) -> bool:
 	connected_commercial = 0
 	connected_industrial = 0
 	district_demand_snapshot.clear()
+	undo_stack.clear()
+	redo_stack.clear()
 	sim_timer = 0.0
 	queue_redraw()
 	return true
@@ -848,3 +874,100 @@ func is_objectives_complete() -> bool:
 
 func get_objectives_complete_tick() -> int:
 	return objectives_complete_tick
+
+func undo_edit() -> void:
+	if undo_stack.is_empty():
+		return
+	redo_stack.append(_capture_edit_state())
+	var previous: Dictionary = undo_stack.pop_back()
+	_restore_edit_state(previous)
+	queue_redraw()
+
+func redo_edit() -> void:
+	if redo_stack.is_empty():
+		return
+	undo_stack.append(_capture_edit_state())
+	var next_state: Dictionary = redo_stack.pop_back()
+	_restore_edit_state(next_state)
+	queue_redraw()
+
+func _begin_edit_stroke() -> void:
+	stroke_capture_active = true
+	stroke_dirty = false
+
+func _end_edit_stroke() -> void:
+	stroke_capture_active = false
+	stroke_dirty = false
+
+func _mark_edit_if_needed() -> void:
+	if stroke_capture_active:
+		if stroke_dirty:
+			return
+		undo_stack.append(_capture_edit_state())
+		_trim_undo_stack()
+		redo_stack.clear()
+		return
+
+	undo_stack.append(_capture_edit_state())
+	_trim_undo_stack()
+	redo_stack.clear()
+
+func _trim_undo_stack() -> void:
+	while undo_stack.size() > MAX_EDIT_HISTORY:
+		undo_stack.remove_at(0)
+
+func _capture_edit_state() -> Dictionary:
+	return {
+		"zone_by_index": zone_by_index.duplicate(),
+		"road_by_index": road_by_index.duplicate(),
+		"building_level_by_index": building_level_by_index.duplicate(),
+		"district_id_by_index": district_id_by_index.duplicate(),
+		"style_profile_by_index": style_profile_by_index.duplicate(),
+		"money": money
+	}
+
+func _restore_edit_state(state: Dictionary) -> void:
+	var zones_v: Variant = state.get("zone_by_index", [])
+	var roads_v: Variant = state.get("road_by_index", [])
+	var levels_v: Variant = state.get("building_level_by_index", [])
+	var districts_v: Variant = state.get("district_id_by_index", [])
+	var styles_v: Variant = state.get("style_profile_by_index", [])
+	if typeof(zones_v) != TYPE_ARRAY:
+		return
+	if typeof(roads_v) != TYPE_ARRAY:
+		return
+	if typeof(levels_v) != TYPE_ARRAY:
+		return
+	if typeof(districts_v) != TYPE_ARRAY:
+		return
+	if typeof(styles_v) != TYPE_ARRAY:
+		return
+
+	zone_by_index.clear()
+	road_by_index.clear()
+	building_level_by_index.clear()
+	district_id_by_index.clear()
+	style_profile_by_index.clear()
+
+	var zones: Array = zones_v
+	var roads: Array = roads_v
+	var levels: Array = levels_v
+	var districts: Array = districts_v
+	var styles: Array = styles_v
+	if roads.size() != zones.size():
+		return
+	if levels.size() != zones.size():
+		return
+	if districts.size() != zones.size():
+		return
+	if styles.size() != zones.size():
+		return
+
+	for i in range(zones.size()):
+		zone_by_index.append(int(zones[i]))
+		road_by_index.append(bool(roads[i]))
+		building_level_by_index.append(int(levels[i]))
+		district_id_by_index.append(String(districts[i]))
+		style_profile_by_index.append(String(styles[i]))
+
+	money = int(state.get("money", money))

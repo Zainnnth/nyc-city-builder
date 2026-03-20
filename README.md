@@ -18,6 +18,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `4` Industrial
   - `5` Bulldoze
 - Click-and-drag placement on the map.
+- Edit history:
+  - `Ctrl+Z` undo
+  - `Ctrl+Y` redo
 - District-seeded procedural blocks from GeoJSON data:
   - Loads `data/processed/buildings_districted.geojson` if available.
   - Falls back to `data/raw/sample_buildings.geojson` otherwise.
