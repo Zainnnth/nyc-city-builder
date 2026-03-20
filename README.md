@@ -11,7 +11,17 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 
 ## Current Prototype
 
-- Grid-based city map placeholder with zoned lot colors.
+- Paintable grid with tools:
+  - `1` Road
+  - `2` Residential
+  - `3` Commercial
+  - `4` Industrial
+  - `5` Bulldoze
+- Click-and-drag placement on the map.
+- Basic simulation tick (1 second):
+  - Road-connected zones grow buildings.
+  - Population/jobs capacity updates.
+  - Money updates from taxes and upkeep.
 - Camera pan with arrow keys.
 - Mouse-wheel zoom.
 
@@ -23,7 +33,7 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 
 ## Next Milestones
 
-1. Add placeable roads and zoning tools.
-2. Simulate population/jobs/tax loop.
+1. Add demand bars and tool hotbar UI widgets.
+2. Add road connectivity/path graph with route cost.
 3. Add district mood layers (Harlem, Lower East Side, Midtown).
 4. Replace flat lots with sprite-kit/3D hybrid tiles.
