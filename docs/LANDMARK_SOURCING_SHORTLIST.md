@@ -66,4 +66,6 @@ Use this shortlist to fill `data/runtime/landmark_assets.json` slots with real m
 2. Clean mesh in Blender (`Ctrl+A` transforms, set pivot/base).
 3. Export `.glb` to target path in `assets/landmarks/nyc/...`.
 4. Run `tools/dev/validate_landmark_pack.ps1`.
-5. Launch game and tune `scene_scale`, `scene_offset_x`, `scene_offset_y` in `data/runtime/landmark_assets.json`.
+5. Register source + license:
+   - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key <slot> --source-id <source> --dataset-name <name> --license-id <license> --source-url <url> --scene-path <res://...glb>`
+6. Launch game and tune `scene_scale`, `scene_offset_x`, `scene_offset_y` in `data/runtime/landmark_assets.json`.

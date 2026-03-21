@@ -17,6 +17,18 @@
       "display_name": "USGS / Public LiDAR",
       "license_ids": ["PUBLIC_DOMAIN_OR_EQUIV"],
       "usage": ["commercial", "non_commercial", "derivative_ok"]
+    },
+    {
+      "source_id": "sketchfab",
+      "display_name": "Sketchfab",
+      "license_ids": ["CC_BY_4_0", "CC0_1_0", "SKETCHFAB_STANDARD"],
+      "usage": ["commercial", "non_commercial", "attribution_may_be_required", "derivative_check_per_asset"]
+    },
+    {
+      "source_id": "fab",
+      "display_name": "Fab Marketplace",
+      "license_ids": ["FAB_STANDARD"],
+      "usage": ["commercial", "non_commercial", "derivative_check_per_asset"]
     }
   ],
   "restricted_sources": [

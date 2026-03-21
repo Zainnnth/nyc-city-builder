@@ -223,6 +223,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - Render optimization profile: `data/runtime/render_optimization.json`
 - Landmark pack validator:
   - `powershell -ExecutionPolicy Bypass -File tools/dev/validate_landmark_pack.ps1`
+- Landmark intake registration:
+  - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:
@@ -243,6 +245,6 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Real landmark mesh pack (`.glb`) replacing placeholder scene assets.
-2. Landmark replacement cadence (proxy -> authored packs).
+1. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.
+2. Complete all six landmark slots and verify with `validate_landmark_pack.ps1`.
 3. District-specific event content expansion and tuning.

@@ -71,3 +71,4 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Cel-shaded material/shader pass for late-90s/early-2000s look
 - [x] District-based prefab set assignment and weighted spawn rules
 - [x] Godot import presets + optimization (LODs, occlusion, batching checks)
+- [x] Landmark intake automation (policy validation + provenance registration script)

@@ -15,9 +15,10 @@ This pipeline is for collecting and transforming NYC building data from permitte
 - `config/district_profiles.json`: district segmentation metadata and bboxes.
 - `scripts/ingest_buildings.py`: normalize source GeoJSON to internal schema.
 - `scripts/segment_districts.py`: assign district tags from lon/lat bboxes.
-- `../.. /data/raw/`: place downloaded source files here.
-- `../.. /data/processed/`: generated outputs.
-- `../.. /data/provenance/`: provenance log CSV.
+- `scripts/register_landmark_asset.py`: register landmark mesh intake, update runtime manifest, append provenance.
+- `../../data/raw/`: place downloaded source files here.
+- `../../data/processed/`: generated outputs.
+- `../../data/provenance/`: provenance logs.
 
 ## Quick Start
 
@@ -26,6 +27,8 @@ This pipeline is for collecting and transforming NYC building data from permitte
    - `python tools/pipeline/scripts/ingest_buildings.py --input data/raw/buildings.geojson --source-id nyc_open_data --dataset-name mappluto_2025q4 --license-id NYC_OPEN_DATA --out data/processed/buildings_normalized.geojson`
 3. Run district segmentation:
    - `python tools/pipeline/scripts/segment_districts.py --input data/processed/buildings_normalized.geojson --districts tools/pipeline/config/district_profiles.json --out data/processed/buildings_districted.geojson`
+4. Register landmark mesh intake:
+   - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb --author "Author Name" --attribution "CC BY 4.0 - Author Name"`
 
 ## Schema Mapping Options
 
@@ -47,3 +50,4 @@ Example using feet-based source heights:
 - Current scripts use Python standard library only.
 - Coordinate assumptions for district segmentation: WGS84 lon/lat (`EPSG:4326`).
 - Replace bbox segmentation with full polygon tests later for better accuracy.
+- Landmark source policy allows licensed Sketchfab/Fab assets and blocks Google Earth extraction sources.

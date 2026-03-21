@@ -46,6 +46,9 @@ Use this checklist before importing new building/model datasets.
 - [ ] Materials follow project style direction (cel-shaded target).
 - [ ] Import settings reviewed for memory/perf.
 - [ ] Attribution and author credit text prepared.
+- [ ] Landmark intake registered with:
+  - [ ] `python tools/pipeline/scripts/register_landmark_asset.py ...`
+  - [ ] `data/provenance/landmark_ingest_log.jsonl` appended.
 
 ## Done Criteria
 
