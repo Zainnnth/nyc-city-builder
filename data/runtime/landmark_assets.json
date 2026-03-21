@@ -1,8 +1,9 @@
 {
   "assets": {
     "empire_state_proxy": {
-      "display_name": "Empire State Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "Empire State Building",
+      "scene_path": "res://assets/landmarks/nyc/empire_state/empire_state.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 1.2,
       "scene_offset_x": 0.0,
       "scene_offset_y": -10.0,
@@ -18,8 +19,9 @@
       }
     },
     "chrysler_proxy": {
-      "display_name": "Chrysler Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "Chrysler Building",
+      "scene_path": "res://assets/landmarks/nyc/chrysler/chrysler.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 1.1,
       "scene_offset_x": 0.0,
       "scene_offset_y": -8.0,
@@ -35,8 +37,9 @@
       }
     },
     "fidi_crown_proxy": {
-      "display_name": "FiDi Crown Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "FiDi Crown Tower",
+      "scene_path": "res://assets/landmarks/nyc/fidi_crown/fidi_crown.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 1.12,
       "scene_offset_x": 0.0,
       "scene_offset_y": -8.0,
@@ -52,8 +55,9 @@
       }
     },
     "les_neon_hub_proxy": {
-      "display_name": "LES Neon Hub Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "LES Neon Hub",
+      "scene_path": "res://assets/landmarks/nyc/les_neon_hub/les_neon_hub.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 0.95,
       "scene_offset_x": 0.0,
       "scene_offset_y": -5.0,
@@ -69,8 +73,9 @@
       }
     },
     "harlem_hall_proxy": {
-      "display_name": "Harlem Hall Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "Harlem Cultural Hall",
+      "scene_path": "res://assets/landmarks/nyc/harlem_hall/harlem_hall.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 0.92,
       "scene_offset_x": 0.0,
       "scene_offset_y": -4.0,
@@ -86,8 +91,9 @@
       }
     },
     "queens_exchange_proxy": {
-      "display_name": "Queens Exchange Proxy",
-      "scene_path": "res://scenes/landmarks/generic_landmark.tscn",
+      "display_name": "Queens Exchange Hub",
+      "scene_path": "res://assets/landmarks/nyc/queens_exchange/queens_exchange.glb",
+      "fallback_scene_path": "res://scenes/landmarks/generic_landmark.tscn",
       "scene_scale": 1.0,
       "scene_offset_x": 0.0,
       "scene_offset_y": -6.0,

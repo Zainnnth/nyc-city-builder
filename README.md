@@ -219,7 +219,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - Prefab set config: `data/runtime/prefab_sets.json`
 - Landmark pack config: `data/runtime/landmark_pack.json`
 - Landmark asset manifest: `data/runtime/landmark_assets.json`
+- Landmark mesh drop folder: `assets/landmarks/nyc/` (see `assets/landmarks/nyc/README.md`)
 - Render optimization profile: `data/runtime/render_optimization.json`
+- Landmark pack validator:
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/validate_landmark_pack.ps1`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:

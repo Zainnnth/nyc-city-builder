@@ -233,11 +233,15 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		)
 		if not landmark.is_empty() and not asset.is_empty():
 			var scene_path: String = String(asset.get("scene_path", ""))
-			if scene_path != "":
+			var fallback_scene_path: String = String(asset.get("fallback_scene_path", ""))
+			var glb_path: String = String(asset.get("glb_path", ""))
+			if scene_path != "" or glb_path != "" or fallback_scene_path != "":
 				import_requests.append(
 					{
 						"cell_key": _cell_key(cell),
 						"scene_path": scene_path,
+						"glb_path": glb_path,
+						"fallback_scene_path": fallback_scene_path,
 						"position": (t0 + t1 + t2 + t3) / 4.0,
 						"sort_key": g2.y,
 						"scene_scale": float(asset.get("scene_scale", 1.0)),
@@ -619,13 +623,12 @@ func _spawn_imported_landmark_scenes(requests: Array) -> void:
 		if typeof(request_v) != TYPE_DICTIONARY:
 			continue
 		var request: Dictionary = request_v
-		var scene_path: String = String(request.get("scene_path", ""))
-		if scene_path == "":
+		var candidates: Array[String] = _scene_candidates(request)
+		if candidates.is_empty():
 			continue
-		var res: Resource = load(scene_path)
-		if not (res is PackedScene):
+		var packed: PackedScene = _load_first_packed_scene(candidates)
+		if packed == null:
 			continue
-		var packed: PackedScene = res
 		var inst_v: Node = packed.instantiate()
 		if not (inst_v is Node2D):
 			inst_v.queue_free()
@@ -653,6 +656,26 @@ func _mark_instance_imported(cell_key: String) -> void:
 		item["landmark_has_import"] = true
 		massing_instances[i] = item
 		return
+
+func _scene_candidates(request: Dictionary) -> Array[String]:
+	var candidates: Array[String] = []
+	for key in ["scene_path", "glb_path", "fallback_scene_path", "scene_path_fallback"]:
+		var path: String = String(request.get(key, "")).strip_edges()
+		if path == "":
+			continue
+		if path in candidates:
+			continue
+		candidates.append(path)
+	return candidates
+
+func _load_first_packed_scene(paths: Array[String]) -> PackedScene:
+	for scene_path in paths:
+		if not FileAccess.file_exists(scene_path):
+			continue
+		var res: Resource = load(scene_path)
+		if res is PackedScene:
+			return res
+	return null
 
 func _view_cull_rect() -> Rect2:
 	var vp_size: Vector2 = get_viewport_rect().size
