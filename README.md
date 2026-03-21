@@ -38,6 +38,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
     - Runtime-generated block forms from seeded records (no external meshes required)
     - Style-driven shaping from `data/runtime/massing_profiles.json`
     - District prefab assignment with weighted spawn rules from `data/runtime/prefab_sets.json`
+    - NYC3D per-building catalog metadata integration:
+      - Loads local district catalogs from `data/processed/nyc3d_buildings/*/catalog.json`
+      - Deterministically samples building entries per seeded cell (district/style aware)
+      - Blends extracted `height_m` into runtime massing height for more district-realistic silhouettes
     - District-tinted cel-style shader pass (`shaders/cel_massing.gdshader`) for skyline readability
     - Landmark pack v0 overlays weighted hero proxies by district/archetype
     - Landmark config in `data/runtime/landmark_pack.json`
@@ -235,6 +239,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - NYC 3D per-building extraction (catalog, optional glb export):
   - `powershell -ExecutionPolicy Bypass -File tools/dev/extract_nyc3d_buildings.ps1 -DistrictCode MN01 -MaxBuildingsPerDistrict 200`
   - Optional meshes: add `-WriteGlb`
+- Optional runtime catalog index (explicit catalog path list):
+  - `data/runtime/nyc3d_building_catalog_index.json`
 - NYC 3D in-game preview overlay:
   - Main scene loads converted district `.glb` chunks from `data/processed/nyc3d_district_mesh_manifest.json`
   - Toggle overlay with `H`
@@ -263,5 +269,5 @@ python tools/pipeline/scripts/segment_districts.py \
 ## Next Milestones
 
 1. Continue NYC3D district conversion with robust external converter path for remaining entries.
-2. Extract per-building catalogs from converted districts and begin building-level spawn integration.
+2. Promote building-level integration from metadata-only to direct per-building mesh placement + LOD/streaming.
 3. Refresh partial NYC3D manifests and keep preview/runtime synced to converted chunks.

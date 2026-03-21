@@ -37,6 +37,9 @@ Use this checklist before importing new building/model datasets.
 ## 5) Game Integration Gate
 
 - [ ] Processed output placed in `data/processed/`.
+- [ ] For NYC3D building catalogs:
+  - [ ] `data/processed/nyc3d_buildings/<DISTRICT>/catalog.json` generated.
+  - [ ] Optional `data/runtime/nyc3d_building_catalog_index.json` updated (if using explicit index).
 - [ ] Scene boot validates with new data.
 - [ ] Smoke checks pass:
   - [ ] `powershell -ExecutionPolicy Bypass -File tools/smoke/run_smoke.ps1`

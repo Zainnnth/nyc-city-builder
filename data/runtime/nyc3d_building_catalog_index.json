@@ -1,0 +1,4 @@
+{
+  "catalogs": [],
+  "notes": "Optional explicit list for runtime NYC3D per-building catalogs. Leave empty to auto-discover under data/processed/nyc3d_buildings/<DISTRICT>/catalog.json"
+}

@@ -43,6 +43,7 @@ This pipeline is for collecting and transforming NYC building data from permitte
 7. Extract building-level catalog from a district file:
    - `node tools/pipeline/node/extract_buildings_from_3dm.js --input data/raw/nyc3d/source/MN01.3dm --district-code MN01 --district-id financial_district --style-profile historic_core_tower_mix --out-catalog data/processed/nyc3d_buildings/MN01/catalog.json --max-buildings 200`
    - Optional mesh export: add `--write-glb --out-glb-dir assets/buildings/nyc3d/buildings/MN01`
+   - Optional explicit runtime index for catalogs: `data/runtime/nyc3d_building_catalog_index.json`
 
 ## Schema Mapping Options
 

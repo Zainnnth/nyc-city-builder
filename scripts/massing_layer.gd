@@ -7,6 +7,9 @@ extends Node2D
 @export var landmark_assets_path := "res://data/runtime/landmark_assets.json"
 @export var prefab_sets_path := "res://data/runtime/prefab_sets.json"
 @export var optimization_profile_path := "res://data/runtime/render_optimization.json"
+@export var nyc3d_catalog_root := "res://data/processed/nyc3d_buildings"
+@export var nyc3d_catalog_index_path := "res://data/runtime/nyc3d_building_catalog_index.json"
+@export var use_nyc3d_catalog_metadata := true
 @export var cel_shader_path := "res://shaders/cel_massing.gdshader"
 @export var use_cel_shader := true
 @export_range(2.0, 8.0, 1.0) var cel_shade_steps := 4.0
@@ -21,6 +24,8 @@ var landmark_pack: Dictionary = {}
 var landmark_assets: Dictionary = {}
 var prefab_sets: Dictionary = {}
 var optimization_profile: Dictionary = {}
+var nyc3d_entries_by_district: Dictionary = {}
+var nyc3d_entries_by_style: Dictionary = {}
 var massing_instances: Array[Dictionary] = []
 var imported_landmark_nodes: Array[Node2D] = []
 var last_render_stats := {
@@ -65,6 +70,7 @@ func _ready() -> void:
 	landmark_assets = _load_landmark_assets()
 	prefab_sets = _load_prefab_sets()
 	optimization_profile = _load_optimization_profile()
+	_load_nyc3d_catalogs()
 	_apply_cel_shader()
 	if district_generator != null and district_generator.has_signal("seed_records_generated"):
 		district_generator.connect("seed_records_generated", _on_seed_records_generated)
@@ -155,6 +161,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		var style_profile: String = String(seed_record.get("style_profile", "default_mixed"))
 		var district_id: String = String(seed_record.get("district_id", "outer_borough_mix"))
 		var archetype: String = String(seed_record.get("archetype", ""))
+		var catalog_entry: Dictionary = _select_nyc3d_catalog_entry(seed_record, world_seed)
 		var profile: Dictionary = _profile_for(style_profile)
 		var prefab: Dictionary = _select_prefab_config(seed_record, world_seed)
 		if not prefab.is_empty():
@@ -173,6 +180,7 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 		var asset_height_mult: float = clamp(float(asset.get("height_mult", 1.0)), 0.75, 3.5)
 		var prefab_height_mult: float = clamp(float(prefab.get("height_mult", 1.0)), 0.65, 3.5)
 		var height_px: float = max(8.0, float(level) * height_per_level * landmark_height_mult * asset_height_mult * prefab_height_mult + jitter)
+		height_px = _apply_catalog_height_override(height_px, catalog_entry)
 		var skew_x: float = clamp(float(profile.get("iso_skew_x", 0.42)), 0.2, 0.8)
 		var skew_y: float = clamp(float(profile.get("iso_skew_y", 1.0)), 0.65, 1.35)
 		var lift := Vector2(-height_px * skew_x, -height_px * skew_y)
@@ -224,6 +232,9 @@ func _rebuild_massing(seed_records: Array, world_seed: int) -> void:
 				"landmark_name": String(landmark.get("name", "")),
 				"landmark_asset_id": String(landmark.get("asset_id", "")),
 				"landmark_has_import": false,
+				"nyc3d_building_id": String(catalog_entry.get("building_id", "")),
+				"nyc3d_district_code": String(catalog_entry.get("district_code", "")),
+				"nyc3d_height_m": float(catalog_entry.get("height_m", 0.0)),
 				"prefab_id": String(prefab.get("id", "")),
 				"archetype": archetype,
 				"height_px": height_px,
@@ -326,6 +337,161 @@ func _load_optimization_profile() -> Dictionary:
 	for key in profile.keys():
 		merged[key] = profile[key]
 	return merged
+
+func _load_nyc3d_catalogs() -> void:
+	nyc3d_entries_by_district.clear()
+	nyc3d_entries_by_style.clear()
+	if not use_nyc3d_catalog_metadata:
+		return
+	var catalog_paths: Array[String] = _discover_nyc3d_catalog_paths()
+	for path in catalog_paths:
+		_append_catalog_entries_from_path(path)
+
+func _discover_nyc3d_catalog_paths() -> Array[String]:
+	var output: Array[String] = []
+	if FileAccess.file_exists(nyc3d_catalog_index_path):
+		var indexed: Array[String] = _catalog_paths_from_index(nyc3d_catalog_index_path)
+		for path in indexed:
+			if path in output:
+				continue
+			output.append(path)
+	if not output.is_empty():
+		return output
+	var dir := DirAccess.open(nyc3d_catalog_root)
+	if dir == null:
+		return output
+	dir.list_dir_begin()
+	while true:
+		var name := dir.get_next()
+		if name == "":
+			break
+		if name.begins_with("."):
+			continue
+		if not dir.current_is_dir():
+			continue
+		var candidate := nyc3d_catalog_root.path_join(name).path_join("catalog.json")
+		if FileAccess.file_exists(candidate):
+			output.append(candidate)
+	dir.list_dir_end()
+	return output
+
+func _catalog_paths_from_index(index_path: String) -> Array[String]:
+	var output: Array[String] = []
+	var fp := FileAccess.open(index_path, FileAccess.READ)
+	if fp == null:
+		return output
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return output
+	var payload: Dictionary = parsed
+	var catalogs_v: Variant = payload.get("catalogs", [])
+	if typeof(catalogs_v) != TYPE_ARRAY:
+		return output
+	var catalogs: Array = catalogs_v
+	for entry_v in catalogs:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_v
+		var path: String = String(entry.get("catalog_path", "")).strip_edges()
+		if path == "":
+			continue
+		output.append(path)
+	return output
+
+func _append_catalog_entries_from_path(path: String) -> void:
+	if not FileAccess.file_exists(path):
+		return
+	var fp := FileAccess.open(path, FileAccess.READ)
+	if fp == null:
+		return
+	var parsed: Variant = JSON.parse_string(fp.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var payload: Dictionary = parsed
+	var district_id: String = String(payload.get("district_id", ""))
+	var style_profile: String = String(payload.get("style_profile", ""))
+	var entries_v: Variant = payload.get("entries", [])
+	if typeof(entries_v) != TYPE_ARRAY:
+		return
+	var entries: Array = entries_v
+	for row_v in entries:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if district_id != "":
+			if not nyc3d_entries_by_district.has(district_id):
+				nyc3d_entries_by_district[district_id] = []
+			var district_entries: Array = nyc3d_entries_by_district[district_id]
+			district_entries.append(row.duplicate(true))
+			nyc3d_entries_by_district[district_id] = district_entries
+		if style_profile != "":
+			if not nyc3d_entries_by_style.has(style_profile):
+				nyc3d_entries_by_style[style_profile] = []
+			var style_entries: Array = nyc3d_entries_by_style[style_profile]
+			style_entries.append(row.duplicate(true))
+			nyc3d_entries_by_style[style_profile] = style_entries
+
+func _select_nyc3d_catalog_entry(seed_record: Dictionary, world_seed: int) -> Dictionary:
+	if not use_nyc3d_catalog_metadata:
+		return {}
+	var district_id: String = String(seed_record.get("district_id", ""))
+	var style_profile: String = String(seed_record.get("style_profile", ""))
+	var entries: Array = []
+	if district_id != "" and nyc3d_entries_by_district.has(district_id):
+		var district_v: Variant = nyc3d_entries_by_district.get(district_id, [])
+		if typeof(district_v) == TYPE_ARRAY:
+			entries = district_v
+	if entries.is_empty() and style_profile != "" and nyc3d_entries_by_style.has(style_profile):
+		var style_v: Variant = nyc3d_entries_by_style.get(style_profile, [])
+		if typeof(style_v) == TYPE_ARRAY:
+			entries = style_v
+	if entries.is_empty():
+		return {}
+
+	var level: int = clampi(int(seed_record.get("seed_level", 1)), 1, 3)
+	var target_height_m: float = float(level) * 34.0
+	var filtered: Array[Dictionary] = _filter_entries_by_height(entries, target_height_m)
+	var pool: Array = filtered if not filtered.is_empty() else entries
+	var cell: Vector2i = seed_record.get("cell", Vector2i.ZERO)
+	var pick01: float = _hash01(cell, world_seed, 809)
+	var idx: int = int(floor(pick01 * float(pool.size())))
+	idx = clampi(idx, 0, pool.size() - 1)
+	var picked_v: Variant = pool[idx]
+	if typeof(picked_v) != TYPE_DICTIONARY:
+		return {}
+	return Dictionary(picked_v).duplicate(true)
+
+func _filter_entries_by_height(entries: Array, target_height_m: float) -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	var lower: float = max(6.0, target_height_m * 0.45)
+	var upper: float = target_height_m * 1.75
+	for row_v in entries:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var h: float = float(row.get("height_m", 0.0))
+		if h < lower or h > upper:
+			continue
+		output.append(row.duplicate(true))
+	if not output.is_empty():
+		return output
+	for row_v in entries:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if float(row.get("height_m", 0.0)) > 2.0:
+			output.append(row.duplicate(true))
+	return output
+
+func _apply_catalog_height_override(base_height_px: float, entry: Dictionary) -> float:
+	if entry.is_empty():
+		return base_height_px
+	var height_m: float = float(entry.get("height_m", 0.0))
+	if height_m <= 0.0:
+		return base_height_px
+	var from_catalog_px: float = clamp(height_m * 1.12, 8.0, 220.0)
+	var blend: float = 0.72
+	return lerpf(base_height_px, from_catalog_px, blend)
 
 func _profile_for(style_profile: String) -> Dictionary:
 	if massing_profiles.has(style_profile):

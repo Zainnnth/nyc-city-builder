@@ -83,5 +83,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] UI polish pass v1 (cleanup of control grouping and reduced HUD clutter)
 - [x] NYC3D conversion status/report tooling + partial-manifest refresh workflow
 - [x] Per-building extraction scaffold (district `.3dm` -> building catalog, optional per-building `.glb`)
+- [x] Runtime massing integration v1 (seed cells deterministically sample per-building catalog metadata by district/style)
 - [ ] NYC3D conversion continuation (remaining district `.3dm` files via robust external converter path)
+- [ ] Runtime building mesh placement v2 (spawn per-building `.glb` in-world with streaming/LOD)
 - [ ] NYC3D runtime integration pass (replace preview overlay with production world streaming/placement)
