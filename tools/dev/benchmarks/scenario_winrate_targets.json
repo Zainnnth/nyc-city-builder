@@ -1,0 +1,20 @@
+{
+  "default": {
+    "min_win_rate": 0.5,
+    "max_win_rate": 0.8
+  },
+  "cards": {
+    "balanced_bootstrap": {
+      "min_win_rate": 0.7,
+      "max_win_rate": 0.85
+    },
+    "midtown_liquidity_rush": {
+      "min_win_rate": 0.45,
+      "max_win_rate": 0.65
+    },
+    "outer_borough_civic_push": {
+      "min_win_rate": 0.55,
+      "max_win_rate": 0.75
+    }
+  }
+}

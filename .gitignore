@@ -5,3 +5,10 @@ data/provenance/*.csv
 *.uid
 *.translation
 build/
+benchmark.log
+benchmark_last.json
+scenario_balance_report.json
+tools/dev/benchmarks/*.csv
+tools/dev/benchmarks/*.json
+!tools/dev/benchmarks/budget_thresholds.json
+!tools/dev/benchmarks/scenario_winrate_targets.json

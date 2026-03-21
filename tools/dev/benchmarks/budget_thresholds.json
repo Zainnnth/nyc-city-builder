@@ -1,0 +1,14 @@
+{
+  "default": {
+    "tick_mean_ms_max": 8.0,
+    "tick_p95_ms_max": 12.0,
+    "tick_max_ms_max": 20.0
+  },
+  "profiles": {
+    "ci_smoke": {
+      "tick_mean_ms_max": 8.0,
+      "tick_p95_ms_max": 12.0,
+      "tick_max_ms_max": 20.0
+    }
+  }
+}

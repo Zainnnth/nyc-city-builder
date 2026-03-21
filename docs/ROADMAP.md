@@ -56,10 +56,10 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 
 ## Phase 6 - Gameplay Depth (Next)
 
-- [ ] Goal-card win/loss validation hooks in simulation objectives
-- [ ] Difficulty scaling by district era/theme progression
-- [ ] Save migration/versioning hardening for future schema changes
-- [ ] Optional benchmark scene for large-grid perf telemetry
+- [x] Goal-card win/loss validation hooks in simulation objectives
+- [x] Difficulty scaling by district era/theme progression
+- [x] Save migration/versioning hardening for future schema changes
+- [x] Optional benchmark scene for large-grid perf telemetry
 
 ## Phase 7 - Building Asset Pipeline
 

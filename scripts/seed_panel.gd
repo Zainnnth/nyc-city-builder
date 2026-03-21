@@ -702,6 +702,9 @@ func _refresh_economy() -> void:
 	var job_p: float = float(snap.get("job_pressure", 1.0))
 	var avg_upkeep_hook: float = float(snap.get("avg_upkeep_hook", 1.0))
 	var balance_profile_id: String = String(snap.get("balance_profile_id", "standard"))
+	var era_stage_label: String = String(snap.get("era_stage_label", "Late 90s Stability"))
+	var theme_pressure: float = float(snap.get("theme_pressure", 0.0))
+	var difficulty_upkeep_mult: float = float(snap.get("difficulty_upkeep_mult", 1.0))
 	var event_title: String = String(snap.get("active_event_title", "None"))
 	var event_district: String = String(snap.get("active_event_district", ""))
 	var event_ticks_left: int = int(snap.get("event_ticks_left", 0))
@@ -709,7 +712,15 @@ func _refresh_economy() -> void:
 	econ_money.text = "Money: $%d (%s%d)" % [money, "+" if d_money >= 0 else "", d_money]
 	econ_population.text = "Population: %d (%s%d)" % [pop, "+" if d_pop >= 0 else "", d_pop]
 	econ_jobs.text = "Jobs: %d (%s%d)" % [jobs, "+" if d_jobs >= 0 else "", d_jobs]
-	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f  |  Upkeep x%.2f  |  Balance %s" % [housing_p, job_p, avg_upkeep_hook, balance_profile_id]
+	econ_pressure.text = "Housing P: %.2f  |  Job P: %.2f  |  Upkeep x%.2f  |  Era %s  |  Theme %.0f%%  |  Diff Upkeep x%.2f  |  Balance %s" % [
+		housing_p,
+		job_p,
+		avg_upkeep_hook,
+		era_stage_label,
+		theme_pressure * 100.0,
+		difficulty_upkeep_mult,
+		balance_profile_id
+	]
 	if event_title != "None":
 		econ_pressure.text += "  |  %s (%s, %dt)" % [event_title, event_district, event_ticks_left]
 
@@ -1009,12 +1020,30 @@ func _apply_scenario_payload(payload_v: Variant, fallback_id: String) -> void:
 	if balance_profile_id != "" and city_grid.has_method("set_balance_profile"):
 		city_grid.call("set_balance_profile", balance_profile_id)
 
+	if city_grid.has_method("set_objective_mode"):
+		var objective_mode: String = String(payload.get("objective_mode", "full"))
+		city_grid.call("set_objective_mode", objective_mode)
+
+	if city_grid.has_method("set_difficulty_profile"):
+		var difficulty_profile_v: Variant = payload.get("difficulty_profile", {})
+		if typeof(difficulty_profile_v) == TYPE_DICTIONARY:
+			city_grid.call("set_difficulty_profile", difficulty_profile_v)
+		else:
+			city_grid.call("set_difficulty_profile", {})
+
 	var services_v: Variant = payload.get("service_levels", {})
 	if typeof(services_v) == TYPE_DICTIONARY and city_grid.has_method("set_service_level"):
 		var services: Dictionary = services_v
 		for service_key in services.keys():
 			var service_id: String = String(service_key)
 			city_grid.call("set_service_level", service_id, float(services[service_key]))
+
+	if city_grid.has_method("set_scenario_goal_rules"):
+		var goal_rules_v: Variant = payload.get("goal_rules", [])
+		if typeof(goal_rules_v) == TYPE_ARRAY:
+			city_grid.call("set_scenario_goal_rules", goal_rules_v)
+		else:
+			city_grid.call("set_scenario_goal_rules", [])
 
 	if city_grid.has_method("set_sim_paused"):
 		city_grid.call("set_sim_paused", false)

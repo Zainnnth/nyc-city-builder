@@ -4,6 +4,7 @@
       "name": "Balanced Bootstrap",
       "summary": "Steady city start with moderate services and low volatility.",
       "seed": 1998,
+      "objective_mode": "scenario_only",
       "balance_profile_id": "standard",
       "policies": {
         "midtown_core": "balanced",
@@ -18,17 +19,72 @@
         "sanitation": 55,
         "transit": 55
       },
+      "difficulty_profile": {
+        "stages": [
+          {
+            "id": "late_90s_stability",
+            "label": "Late 90s Stability",
+            "start_tick": 0,
+            "growth_mult": 1.0,
+            "tax_income_mult": 1.0,
+            "upkeep_mult": 1.0,
+            "event_chance_mult": 1.0
+          },
+          {
+            "id": "y2k_transition",
+            "label": "Y2K Transition",
+            "start_tick": 70,
+            "growth_mult": 0.97,
+            "tax_income_mult": 0.99,
+            "upkeep_mult": 1.06,
+            "event_chance_mult": 1.1
+          },
+          {
+            "id": "post_2001_pressure",
+            "label": "Post-2001 Pressure",
+            "start_tick": 140,
+            "growth_mult": 0.93,
+            "tax_income_mult": 0.96,
+            "upkeep_mult": 1.14,
+            "event_chance_mult": 1.2
+          }
+        ]
+      },
+      "goal_rules": [
+        {
+          "id": "balanced_pop_2800",
+          "title": "Reach population 6 by tick 160",
+          "type": "population_target",
+          "target": 6,
+          "deadline_tick": 160
+        },
+        {
+          "id": "balanced_cash_guard",
+          "title": "Reach treasury $18500 by tick 160",
+          "type": "money_target",
+          "target": 18500,
+          "deadline_tick": 160
+        },
+        {
+          "id": "balanced_crime_cap",
+          "title": "Keep average crime <= 28 by tick 160",
+          "type": "avg_crime_max",
+          "target": 28.0,
+          "deadline_tick": 160
+        }
+      ],
       "goal_cards": [
-        "Reach population 2800 by tick 120",
-        "Stay above $35000 treasury",
-        "Keep average crime below 22"
+        "Reach population 6 by tick 160",
+        "Reach treasury $18500 by tick 160",
+        "Keep average crime below 28 by tick 160"
       ]
     },
     "midtown_liquidity_rush": {
       "name": "Midtown Liquidity Rush",
       "summary": "Finance-heavy opening with faster cash flow and higher instability.",
       "seed": 2001,
-      "balance_profile_id": "austerity",
+      "objective_mode": "scenario_only",
+      "balance_profile_id": "austerity_crunch",
       "policies": {
         "midtown_core": "profit",
         "financial_district": "profit",
@@ -42,16 +98,70 @@
         "sanitation": 47,
         "transit": 62
       },
+      "difficulty_profile": {
+        "stages": [
+          {
+            "id": "market_boom",
+            "label": "Market Boom",
+            "start_tick": 0,
+            "growth_mult": 1.0,
+            "tax_income_mult": 1.02,
+            "upkeep_mult": 1.0,
+            "event_chance_mult": 1.05
+          },
+          {
+            "id": "dotcom_shake",
+            "label": "Dot-com Shake",
+            "start_tick": 55,
+            "growth_mult": 0.95,
+            "tax_income_mult": 0.98,
+            "upkeep_mult": 1.1,
+            "event_chance_mult": 1.2
+          },
+          {
+            "id": "credit_squeeze",
+            "label": "Credit Squeeze",
+            "start_tick": 120,
+            "growth_mult": 0.89,
+            "tax_income_mult": 0.93,
+            "upkeep_mult": 1.22,
+            "event_chance_mult": 1.32
+          }
+        ]
+      },
+      "goal_rules": [
+        {
+          "id": "midtown_jobs_2200",
+          "title": "Grow jobs to 16 before tick 140",
+          "type": "jobs_target",
+          "target": 16,
+          "deadline_tick": 140
+        },
+        {
+          "id": "midtown_cashflow_10",
+          "title": "Hold positive cashflow for 10 ticks",
+          "type": "positive_cashflow_streak_target",
+          "target": 10
+        },
+        {
+          "id": "midtown_commute_cap",
+          "title": "Hold commute penalty <= 0.45 by tick 140",
+          "type": "avg_commute_penalty_max",
+          "target": 0.45,
+          "deadline_tick": 140
+        }
+      ],
       "goal_cards": [
-        "Grow jobs to 2200 before tick 110",
-        "Survive one event without negative cashflow",
-        "Hold commute penalty under 0.45"
+        "Grow jobs to 16 before tick 140",
+        "Hold positive cashflow for 10 ticks",
+        "Hold commute penalty under 0.45 by tick 140"
       ]
     },
     "outer_borough_civic_push": {
       "name": "Outer Borough Civic Push",
       "summary": "Service-forward neighborhood expansion with transit focus.",
       "seed": 1995,
+      "objective_mode": "scenario_only",
       "balance_profile_id": "civic_push",
       "policies": {
         "midtown_core": "balanced",
@@ -66,10 +176,64 @@
         "sanitation": 66,
         "transit": 70
       },
+      "difficulty_profile": {
+        "stages": [
+          {
+            "id": "neighborhood_push",
+            "label": "Neighborhood Push",
+            "start_tick": 0,
+            "growth_mult": 1.03,
+            "tax_income_mult": 1.0,
+            "upkeep_mult": 0.97,
+            "event_chance_mult": 0.96
+          },
+          {
+            "id": "infrastructure_stress",
+            "label": "Infrastructure Stress",
+            "start_tick": 80,
+            "growth_mult": 0.98,
+            "tax_income_mult": 0.98,
+            "upkeep_mult": 1.08,
+            "event_chance_mult": 1.08
+          },
+          {
+            "id": "citywide_pressure",
+            "label": "Citywide Pressure",
+            "start_tick": 150,
+            "growth_mult": 0.93,
+            "tax_income_mult": 0.95,
+            "upkeep_mult": 1.16,
+            "event_chance_mult": 1.18
+          }
+        ]
+      },
+      "goal_rules": [
+        {
+          "id": "outer_pop_3200",
+          "title": "Reach population 9 by tick 170",
+          "type": "population_target",
+          "target": 9,
+          "deadline_tick": 170
+        },
+        {
+          "id": "outer_jobs_2200",
+          "title": "Reach jobs 25 by tick 170",
+          "type": "jobs_target",
+          "target": 25,
+          "deadline_tick": 170
+        },
+        {
+          "id": "outer_crime_cap",
+          "title": "Keep average crime <= 28 by tick 170",
+          "type": "avg_crime_max",
+          "target": 28.0,
+          "deadline_tick": 170
+        }
+      ],
       "goal_cards": [
-        "Reach citywide population 3200",
-        "Keep housing pressure below 1.25",
-        "Maintain service stress below 0.35 in 4 districts"
+        "Reach citywide population 9 by tick 170",
+        "Reach jobs 25 by tick 170",
+        "Keep average crime below 28 by tick 170"
       ]
     }
   }

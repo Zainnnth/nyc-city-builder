@@ -39,6 +39,7 @@ func _initialize() -> void:
 
 	if failures.is_empty() and district_generator != null:
 		_check_generator_api(district_generator, failures)
+		_check_save_payload_migration(city_grid, district_generator, failures)
 		if city_grid != null:
 			_check_deterministic_simulation(city_grid, district_generator, failures)
 
@@ -112,7 +113,37 @@ func _check_generator_api(district_generator: Node, failures: Array[String]) -> 
 	if not district_generator.has_method("regenerate"):
 		failures.append("DistrictGenerator missing method: regenerate")
 		return
+	if not district_generator.has_method("load_payload"):
+		failures.append("DistrictGenerator missing method: load_payload")
+	if not district_generator.has_method("get_save_schema_version"):
+		failures.append("DistrictGenerator missing method: get_save_schema_version")
 	district_generator.call("regenerate", 1998, false)
+
+func _check_save_payload_migration(city_grid: Node, district_generator: Node, failures: Array[String]) -> void:
+	if city_grid == null or district_generator == null:
+		return
+	if not district_generator.has_method("load_payload"):
+		return
+	if not city_grid.has_method("export_state"):
+		return
+	var state_v: Variant = city_grid.call("export_state")
+	if typeof(state_v) != TYPE_DICTIONARY:
+		failures.append("Cannot validate save migration: export_state was not Dictionary")
+		return
+	var state: Dictionary = state_v
+
+	var legacy_v1 := {
+		"version": 1,
+		"world_seed": 1998,
+		"city_state": state.duplicate(true)
+	}
+	var legacy_ok: bool = bool(district_generator.call("load_payload", legacy_v1))
+	if not legacy_ok:
+		failures.append("Legacy v1 save payload migration failed")
+
+	var raw_state_ok: bool = bool(district_generator.call("load_payload", state.duplicate(true)))
+	if not raw_state_ok:
+		failures.append("Raw city_state payload migration failed")
 
 func _check_massing_layer_api(massing_layer: Node, failures: Array[String]) -> void:
 	if not massing_layer.has_method("get_render_stats"):

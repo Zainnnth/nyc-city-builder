@@ -1,0 +1,84 @@
+name: Benchmark Budget Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: firebelley/setup-godot@v1
+        with:
+          version: 4.6.1
+          use-dotnet: false
+
+      - name: Verify Godot Version
+        run: godot --version
+
+      - name: Run Benchmark Harness
+        run: |
+          godot --headless --path . --script res://scripts/benchmark_harness.gd -- --bench-steps=120 --bench-warmup=24 --bench-no-out | tee benchmark.log
+
+      - name: Enforce Benchmark Budgets
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          log_path = Path("benchmark.log")
+          budget_path = Path("tools/dev/benchmarks/budget_thresholds.json")
+          if not log_path.exists():
+              print("::error::benchmark.log missing")
+              sys.exit(2)
+          if not budget_path.exists():
+              print("::error::budget_thresholds.json missing")
+              sys.exit(2)
+
+          text = log_path.read_text(encoding="utf-8", errors="replace")
+          matches = re.findall(r"^\[BENCH\]\s+(\{.*\})$", text, flags=re.MULTILINE)
+          if not matches:
+              print("::error::No benchmark JSON payload found in benchmark.log")
+              sys.exit(2)
+
+          report = json.loads(matches[-1])
+          budgets = json.loads(budget_path.read_text(encoding="utf-8"))
+          profile = "ci_smoke"
+          default_b = budgets.get("default", {})
+          profile_b = budgets.get("profiles", {}).get(profile, {})
+          mean_max = float(profile_b.get("tick_mean_ms_max", default_b.get("tick_mean_ms_max", 8.0)))
+          p95_max = float(profile_b.get("tick_p95_ms_max", default_b.get("tick_p95_ms_max", 12.0)))
+          max_max = float(profile_b.get("tick_max_ms_max", default_b.get("tick_max_ms_max", 20.0)))
+
+          tick = report.get("tick_ms", {})
+          mean = float(tick.get("mean", 0.0))
+          p95 = float(tick.get("p95", 0.0))
+          peak = float(tick.get("max", 0.0))
+          print(f"[BENCH] mean={mean:.4f}ms p95={p95:.4f}ms max={peak:.4f}ms")
+          print(f"[BENCH] budget mean<={mean_max:.4f}ms p95<={p95_max:.4f}ms max<={max_max:.4f}ms")
+
+          failures = []
+          if mean > mean_max:
+              failures.append(f"mean {mean:.4f} > budget {mean_max:.4f}")
+          if p95 > p95_max:
+              failures.append(f"p95 {p95:.4f} > budget {p95_max:.4f}")
+          if peak > max_max:
+              failures.append(f"max {peak:.4f} > budget {max_max:.4f}")
+
+          if failures:
+              for failure in failures:
+                  print(f"::error::{failure}")
+              sys.exit(4)
+
+          print("[BENCH] Budget gate PASS")
+          PY

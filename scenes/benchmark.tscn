@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/city_grid.gd" id="1_1ghjk"]
+[ext_resource type="Script" path="res://scripts/district_generator.gd" id="2_9f2la"]
+[ext_resource type="Script" path="res://scripts/massing_layer.gd" id="3_xy87s"]
+
+[node name="BenchmarkMain" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(800, 450)
+enabled = true
+
+[node name="CityGrid" type="Node2D" parent="."]
+position = Vector2(80, 60)
+script = ExtResource("1_1ghjk")
+columns = 48
+rows = 32
+cell_size = 34.0
+
+[node name="MassingLayer" type="Node2D" parent="."]
+position = Vector2(80, 60)
+script = ExtResource("3_xy87s")
+
+[node name="DistrictGenerator" type="Node2D" parent="."]
+position = Vector2(80, 60)
+script = ExtResource("2_9f2la")

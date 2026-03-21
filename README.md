@@ -47,10 +47,11 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
 - In-game seed panel:
   - Enter a seed and click `Apply Seed` to regenerate neighborhoods.
   - Click `Randomize` for a new deterministic layout.
-  - `Save City` / `Load City` persist full simulation state (`user://savegame.json`).
-  - Save slots: `Slot 1-3` (`user://savegame_1.json` etc).
-  - `Autosave` performs rolling slot saves every ~20 seconds.
-  - `Load Latest` loads the newest slot by file timestamp.
+- `Save City` / `Load City` persist full simulation state (`user://savegame.json`).
+- Save slots: `Slot 1-3` (`user://savegame_1.json` etc).
+- `Autosave` performs rolling slot saves every ~20 seconds.
+- `Load Latest` loads the newest slot by file timestamp.
+- Save payloads are schema-versioned (`schema_version`) with legacy migration support for older save formats.
   - Time controls: `Pause/Resume`, `1x`, `3x` simulation speed.
   - Scenario presets:
     - `Balanced Preset`
@@ -153,6 +154,46 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - GitHub Actions workflow at `.github/workflows/smoke.yml`
   - Runs smoke checks automatically on pushes to `main` and pull requests
   - Includes deterministic seeded simulation signature assertions
+  - Benchmark budget gate at `.github/workflows/benchmark.yml`
+  - Fails pull requests if benchmark `mean/p95/max` exceed configured thresholds
+  - Scenario balance gate at `.github/workflows/scenario-balance.yml`
+  - Fails pull requests if scenario win rates drift outside target bands
+
+## Benchmark Harness
+
+- Harness script: `scripts/benchmark_harness.gd`
+- Benchmark scene: `scenes/benchmark.tscn` (48x32 grid)
+- Runner: `tools/dev/run_benchmark.ps1`
+- Trend recorder: `tools/dev/record_benchmark.ps1`
+- Run:
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/run_benchmark.ps1`
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/record_benchmark.ps1 -Profile dev_laptop`
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/record_benchmark.ps1 -Profile ci_smoke -EnforceBudget`
+- Useful params:
+  - `-Steps 400 -Warmup 60 -Seed 1998`
+  - `-Scene res://scenes/benchmark.tscn`
+  - `-TickMeanBudgetMs 7.0 -TickP95BudgetMs 11.0 -TickMaxBudgetMs 18.0`
+- Output:
+  - Prints one-line JSON report (`[BENCH] ...`) to stdout
+  - Writes report to `benchmark_last.json` by default
+  - Recorder appends trend rows to `tools/dev/benchmarks/benchmark_history.csv`
+  - Budget config defaults live in `tools/dev/benchmarks/budget_thresholds.json`
+  - CI reads the same budget config via `.github/workflows/benchmark.yml`
+
+## Scenario Balance Harness
+
+- Harness script: `scripts/scenario_balance_harness.gd`
+- Runner: `tools/dev/run_scenario_balance.ps1`
+- Run:
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/run_scenario_balance.ps1 -Steps 180`
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/run_scenario_balance.ps1 -Steps 180 -Seeds 1995,1998,2001,2004,2008`
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/run_scenario_balance.ps1 -Steps 180 -Seeds 1995,1998,2001,2004,2008 -EnforceTargets`
+- Output:
+  - Prints one-line scenario report JSON (`[BALANCE] ...`) to stdout
+  - Writes report to `tools/dev/benchmarks/scenario_balance_report.json`
+  - Includes objective progress, fail states, and economy endpoint per card
+  - Batch mode includes `summary_by_card` with per-card win rates across seeds
+  - Target gate config: `tools/dev/benchmarks/scenario_winrate_targets.json`
 
 ## Release Automation
 
@@ -199,8 +240,6 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Goal-card win/loss validation hooks in simulation objectives.
-2. Difficulty scaling by district era/theme progression.
-3. Save migration/versioning hardening for future schema changes.
-4. Optional benchmark scene for large-grid perf telemetry.
-5. Real landmark mesh pack (`.glb`) replacing placeholder scene assets.
+1. Real landmark mesh pack (`.glb`) replacing placeholder scene assets.
+2. Landmark replacement cadence (proxy -> authored packs).
+3. District-specific event content expansion and tuning.

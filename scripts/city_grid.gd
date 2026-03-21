@@ -96,6 +96,11 @@ var active_alerts: Array[Dictionary] = []
 var positive_cashflow_streak := 0
 var objectives_complete := false
 var objectives_complete_tick := -1
+var objective_mode := OBJECTIVE_MODE_FULL
+var scenario_goal_rules: Array[Dictionary] = []
+var scenario_goal_breaches: Dictionary = {}
+var scenario_failed := false
+var scenario_fail_reason := ""
 var road_cluster_count := 0
 var largest_road_cluster := 0
 var road_efficiency := 1.0
@@ -107,6 +112,14 @@ var district_upkeep_hook_map: Dictionary = {}
 var district_identity_profiles: Dictionary = {}
 var balance_profiles: Dictionary = {}
 var current_balance_profile_id := "standard"
+var difficulty_profile: Dictionary = {}
+var current_era_stage_id := "late_90s_stability"
+var current_era_stage_label := "Late 90s Stability"
+var current_theme_pressure := 0.0
+var current_difficulty_growth_mult := 1.0
+var current_difficulty_tax_mult := 1.0
+var current_difficulty_upkeep_mult := 1.0
+var current_difficulty_event_mult := 1.0
 var service_levels := {
 	"police": 55.0,
 	"fire": 55.0,
@@ -151,6 +164,8 @@ const DISTRICT_UPKEEP_MULT := {
 const POLICY_BALANCED := "balanced"
 const POLICY_GROWTH := "growth"
 const POLICY_PROFIT := "profit"
+const OBJECTIVE_MODE_FULL := "full"
+const OBJECTIVE_MODE_SCENARIO_ONLY := "scenario_only"
 
 const POLICY_GROWTH_MULT := {
 	POLICY_BALANCED: 1.0,
@@ -224,6 +239,38 @@ const DEFAULT_BALANCE_PROFILES := {
 	}
 }
 
+const DEFAULT_DIFFICULTY_PROFILE := {
+	"stages": [
+		{
+			"id": "late_90s_stability",
+			"label": "Late 90s Stability",
+			"start_tick": 0,
+			"growth_mult": 1.0,
+			"tax_income_mult": 1.0,
+			"upkeep_mult": 1.0,
+			"event_chance_mult": 1.0
+		},
+		{
+			"id": "y2k_transition",
+			"label": "Y2K Transition",
+			"start_tick": 70,
+			"growth_mult": 0.96,
+			"tax_income_mult": 0.99,
+			"upkeep_mult": 1.08,
+			"event_chance_mult": 1.12
+		},
+		{
+			"id": "post_2001_pressure",
+			"label": "Post-2001 Pressure",
+			"start_tick": 140,
+			"growth_mult": 0.91,
+			"tax_income_mult": 0.95,
+			"upkeep_mult": 1.18,
+			"event_chance_mult": 1.26
+		}
+	]
+}
+
 var overlay_mode := OVERLAY_NONE
 var overlay_alpha := 0.42
 var atmosphere_time := 0.0
@@ -257,6 +304,7 @@ func _draw() -> void:
 func _ready() -> void:
 	sim_rng.randomize()
 	_balance_profiles_from_default()
+	_difficulty_profile_from_default()
 	_init_tiles()
 	queue_redraw()
 
@@ -586,6 +634,7 @@ func _run_sim_step() -> void:
 	road_cluster_count = int(road_graph.get("component_count", 0))
 	largest_road_cluster = int(road_graph.get("largest_cluster", 0))
 	road_efficiency = 1.0 if road_count <= 0 else float(largest_road_cluster) / float(road_count)
+	_update_difficulty_runtime()
 
 	connected_residential = 0
 	connected_commercial = 0
@@ -599,7 +648,7 @@ func _run_sim_step() -> void:
 			if road_by_index[i]:
 				var road_district_id: String = district_id_by_index[i]
 				var district_upkeep_hook: float = float(district_upkeep_hook_map.get(road_district_id, 1.0))
-				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(road_district_id) * district_upkeep_hook * _event_upkeep_multiplier(road_district_id) * balance_upkeep_mult
+				road_upkeep_cost += 2.0 * _district_upkeep_multiplier(road_district_id) * district_upkeep_hook * _event_upkeep_multiplier(road_district_id) * balance_upkeep_mult * current_difficulty_upkeep_mult
 				land_value_by_index[i] = 42.0
 				noise_by_index[i] = 26.0
 				crime_by_index[i] = 14.0 + (1.0 - _service_norm("police")) * 18.0
@@ -649,7 +698,7 @@ func _run_sim_step() -> void:
 			var identity_noise_mult: float = _identity_noise_penalty_multiplier(identity_profile)
 			var road_commute_mult: float = _road_commute_multiplier(adjacent_component, component_sizes) * (1.0 - commute_penalty)
 			var zone_service_mult: float = _zone_service_multiplier(zone)
-			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id) * identity_growth_mult * balance_growth_mult
+			var growth_mult := _growth_multiplier(style_profile) * _policy_growth_multiplier(policy_id) * road_commute_mult * zone_service_mult * _event_growth_multiplier(zone, district_id) * identity_growth_mult * balance_growth_mult * current_difficulty_growth_mult
 			if zone == Tool.RESIDENTIAL:
 				connected_residential += 1
 				var res_cap := int(round(float(ZONE_CAPACITY[zone]) * level * growth_mult))
@@ -668,8 +717,8 @@ func _run_sim_step() -> void:
 			var tile_output := (float(level) * 4.0) + 3.0
 			var district_hook: float = float(district_upkeep_hook_map.get(district_id, 1.0))
 			var live_upkeep_hook: float = clamp(1.0 + commute_penalty * 0.35 + (1.0 - zone_service_mult) * 0.28, 0.85, 1.7)
-			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id) * identity_tax_mult * balance_tax_mult
-			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id) * balance_upkeep_mult
+			tax_income_raw += tile_output * _district_tax_multiplier(district_id) * _policy_tax_multiplier(policy_id) * _event_tax_multiplier(district_id) * identity_tax_mult * balance_tax_mult * current_difficulty_tax_mult
+			zone_upkeep_cost += 1.0 * _district_upkeep_multiplier(district_id) * _policy_upkeep_multiplier(policy_id) * district_hook * live_upkeep_hook * _event_upkeep_multiplier(district_id) * balance_upkeep_mult * current_difficulty_upkeep_mult
 			service_upkeep_cost += _zone_service_cost(zone)
 			stat["level_sum"] = int(stat["level_sum"]) + level
 			stat["traffic_penalty_sum"] = float(stat["traffic_penalty_sum"]) + commute_penalty
@@ -742,6 +791,7 @@ func _run_sim_step() -> void:
 	_update_event_system(district_stats)
 	_push_economy_point()
 	_update_district_demand_snapshot(district_stats)
+	_update_scenario_goal_runtime()
 	_update_active_alerts()
 
 func _is_adjacent_to_road(cell: Vector2i) -> bool:
@@ -926,6 +976,7 @@ func reset_grid() -> void:
 	positive_cashflow_streak = 0
 	objectives_complete = false
 	objectives_complete_tick = -1
+	objective_mode = OBJECTIVE_MODE_FULL
 	road_cluster_count = 0
 	largest_road_cluster = 0
 	road_efficiency = 1.0
@@ -935,6 +986,7 @@ func reset_grid() -> void:
 	avg_crime = 0.0
 	_balance_profiles_from_default()
 	current_balance_profile_id = "standard"
+	_difficulty_profile_from_default()
 	district_upkeep_hook_map.clear()
 	service_levels["police"] = 55.0
 	service_levels["fire"] = 55.0
@@ -947,6 +999,10 @@ func reset_grid() -> void:
 	recent_events.clear()
 	undo_stack.clear()
 	redo_stack.clear()
+	scenario_goal_rules.clear()
+	scenario_goal_breaches.clear()
+	scenario_failed = false
+	scenario_fail_reason = ""
 	sim_tick = 0
 	sim_timer = 0.0
 	atmosphere_time = 0.0
@@ -1137,6 +1193,16 @@ func _balance_profiles_from_default() -> void:
 	if not balance_profiles.has(current_balance_profile_id):
 		current_balance_profile_id = "standard"
 
+func _difficulty_profile_from_default() -> void:
+	difficulty_profile = DEFAULT_DIFFICULTY_PROFILE.duplicate(true)
+	current_era_stage_id = "late_90s_stability"
+	current_era_stage_label = "Late 90s Stability"
+	current_theme_pressure = 0.0
+	current_difficulty_growth_mult = 1.0
+	current_difficulty_tax_mult = 1.0
+	current_difficulty_upkeep_mult = 1.0
+	current_difficulty_event_mult = 1.0
+
 func set_balance_profiles(payload: Dictionary) -> void:
 	if payload.is_empty():
 		_balance_profiles_from_default()
@@ -1163,6 +1229,40 @@ func set_balance_profile(profile_id: String) -> bool:
 		return false
 	current_balance_profile_id = profile_id
 	return true
+
+func set_difficulty_profile(payload: Dictionary) -> bool:
+	if payload.is_empty():
+		_difficulty_profile_from_default()
+		return true
+	var stages_v: Variant = payload.get("stages", null)
+	if typeof(stages_v) != TYPE_ARRAY:
+		return false
+	var stages: Array = stages_v
+	if stages.is_empty():
+		return false
+	var normalized_stages: Array[Dictionary] = []
+	for stage_v in stages:
+		if typeof(stage_v) != TYPE_DICTIONARY:
+			continue
+		var stage: Dictionary = Dictionary(stage_v).duplicate(true)
+		stage["id"] = String(stage.get("id", "stage_%d" % normalized_stages.size()))
+		stage["label"] = String(stage.get("label", stage["id"]))
+		stage["start_tick"] = max(int(stage.get("start_tick", 0)), 0)
+		stage["growth_mult"] = clamp(float(stage.get("growth_mult", 1.0)), 0.75, 1.2)
+		stage["tax_income_mult"] = clamp(float(stage.get("tax_income_mult", 1.0)), 0.75, 1.2)
+		stage["upkeep_mult"] = clamp(float(stage.get("upkeep_mult", 1.0)), 0.85, 1.5)
+		stage["event_chance_mult"] = clamp(float(stage.get("event_chance_mult", 1.0)), 0.75, 1.6)
+		normalized_stages.append(stage)
+	if normalized_stages.is_empty():
+		return false
+	normalized_stages.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("start_tick", 0)) < int(b.get("start_tick", 0))
+	)
+	difficulty_profile = {"stages": normalized_stages}
+	return true
+
+func get_difficulty_profile() -> Dictionary:
+	return difficulty_profile.duplicate(true)
 
 func get_balance_profile_id() -> String:
 	return current_balance_profile_id
@@ -1195,6 +1295,69 @@ func _balance_upkeep_multiplier() -> float:
 
 func _balance_event_chance_multiplier() -> float:
 	return clamp(float(_balance_profile().get("event_chance_mult", 1.0)), 0.6, 1.6)
+
+func _active_difficulty_stage() -> Dictionary:
+	var stages_v: Variant = difficulty_profile.get("stages", [])
+	if typeof(stages_v) != TYPE_ARRAY:
+		return {}
+	var stages: Array = stages_v
+	if stages.is_empty():
+		return {}
+	var selected: Dictionary = Dictionary(stages[0])
+	for stage_v in stages:
+		if typeof(stage_v) != TYPE_DICTIONARY:
+			continue
+		var stage: Dictionary = stage_v
+		if sim_tick >= int(stage.get("start_tick", 0)):
+			selected = stage
+		else:
+			break
+	return selected
+
+func _theme_pressure() -> float:
+	var total_districts: int = max(district_policy_map.size(), 1)
+	var profit_districts := 0
+	for district_key in district_policy_map.keys():
+		var district_id: String = String(district_key)
+		var policy_id: String = String(district_policy_map[district_id])
+		if policy_id == POLICY_PROFIT:
+			profit_districts += 1
+	var profit_ratio: float = float(profit_districts) / float(total_districts)
+	var core_profit_count := 0
+	for district_id in ["midtown_core", "financial_district"]:
+		if get_district_policy(district_id) == POLICY_PROFIT:
+			core_profit_count += 1
+	var core_profit_ratio: float = float(core_profit_count) / 2.0
+	var fragmentation_pressure: float = clamp((1.0 - road_efficiency) / 0.55, 0.0, 1.0)
+	var commute_pressure: float = clamp(avg_commute_penalty / 0.4, 0.0, 1.0)
+	return clamp(
+		profit_ratio * 0.34
+		+ core_profit_ratio * 0.22
+		+ fragmentation_pressure * 0.22
+		+ commute_pressure * 0.22,
+		0.0,
+		1.0
+	)
+
+func _update_difficulty_runtime() -> void:
+	if difficulty_profile.is_empty():
+		_difficulty_profile_from_default()
+	var stage: Dictionary = _active_difficulty_stage()
+	if stage.is_empty():
+		_difficulty_profile_from_default()
+		stage = _active_difficulty_stage()
+	var stage_growth: float = clamp(float(stage.get("growth_mult", 1.0)), 0.75, 1.2)
+	var stage_tax: float = clamp(float(stage.get("tax_income_mult", 1.0)), 0.75, 1.2)
+	var stage_upkeep: float = clamp(float(stage.get("upkeep_mult", 1.0)), 0.85, 1.5)
+	var stage_event: float = clamp(float(stage.get("event_chance_mult", 1.0)), 0.75, 1.6)
+	var theme: float = _theme_pressure()
+	current_era_stage_id = String(stage.get("id", "late_90s_stability"))
+	current_era_stage_label = String(stage.get("label", current_era_stage_id))
+	current_theme_pressure = theme
+	current_difficulty_growth_mult = clamp(stage_growth * lerp(1.0, 0.9, theme), 0.7, 1.2)
+	current_difficulty_tax_mult = clamp(stage_tax * lerp(1.0, 0.94, theme), 0.7, 1.2)
+	current_difficulty_upkeep_mult = clamp(stage_upkeep * lerp(1.0, 1.16, theme), 0.85, 1.6)
+	current_difficulty_event_mult = clamp(stage_event * lerp(1.0, 1.24, theme), 0.75, 1.8)
 
 func _cash_objective_target() -> int:
 	var mult: float = clamp(float(_balance_profile().get("cash_objective_mult", 1.0)), 0.8, 1.6)
@@ -1349,7 +1512,7 @@ func _update_event_system(stats: Dictionary) -> void:
 		return
 	if stats.is_empty():
 		return
-	var spawn_chance: float = 0.055 * _balance_event_chance_multiplier()
+	var spawn_chance: float = 0.055 * _balance_event_chance_multiplier() * current_difficulty_event_mult
 	if sim_rng.randf() > clamp(spawn_chance, 0.01, 0.2):
 		return
 
@@ -1511,6 +1674,14 @@ func export_state() -> Dictionary:
 		"district_identity_profiles": district_identity_profiles.duplicate(true),
 		"balance_profiles": balance_profiles.duplicate(true),
 		"current_balance_profile_id": current_balance_profile_id,
+		"difficulty_profile": difficulty_profile.duplicate(true),
+		"current_era_stage_id": current_era_stage_id,
+		"current_era_stage_label": current_era_stage_label,
+		"current_theme_pressure": current_theme_pressure,
+		"current_difficulty_growth_mult": current_difficulty_growth_mult,
+		"current_difficulty_tax_mult": current_difficulty_tax_mult,
+		"current_difficulty_upkeep_mult": current_difficulty_upkeep_mult,
+		"current_difficulty_event_mult": current_difficulty_event_mult,
 		"service_levels": service_levels.duplicate(true),
 		"overlay_mode": overlay_mode,
 		"active_event_id": active_event_id,
@@ -1523,8 +1694,13 @@ func export_state() -> Dictionary:
 		"sim_tick": sim_tick,
 		"economy_history": economy_history.duplicate(true),
 		"positive_cashflow_streak": positive_cashflow_streak,
+		"scenario_goal_rules": scenario_goal_rules.duplicate(true),
+		"scenario_goal_breaches": scenario_goal_breaches.duplicate(true),
+		"scenario_failed": scenario_failed,
+		"scenario_fail_reason": scenario_fail_reason,
 		"objectives_complete": objectives_complete,
-		"objectives_complete_tick": objectives_complete_tick
+		"objectives_complete_tick": objectives_complete_tick,
+		"objective_mode": objective_mode
 	}
 
 func import_state(state: Dictionary) -> bool:
@@ -1547,9 +1723,15 @@ func import_state(state: Dictionary) -> bool:
 	var identity_profiles_v: Variant = state.get("district_identity_profiles", null)
 	var balance_profiles_v: Variant = state.get("balance_profiles", null)
 	var balance_profile_id_v: Variant = state.get("current_balance_profile_id", "standard")
+	var difficulty_profile_v: Variant = state.get("difficulty_profile", null)
 	var services_v: Variant = state.get("service_levels", {})
 	var recent_events_v: Variant = state.get("recent_events", [])
 	var history_v: Variant = state.get("economy_history", [])
+	var scenario_rules_v: Variant = state.get("scenario_goal_rules", [])
+	var scenario_breaches_v: Variant = state.get("scenario_goal_breaches", {})
+	var scenario_failed_v: Variant = state.get("scenario_failed", false)
+	var scenario_fail_reason_v: Variant = state.get("scenario_fail_reason", "")
+	var objective_mode_v: Variant = state.get("objective_mode", OBJECTIVE_MODE_FULL)
 
 	if typeof(zones_v) != TYPE_ARRAY:
 		return false
@@ -1573,11 +1755,17 @@ func import_state(state: Dictionary) -> bool:
 		return false
 	if balance_profiles_v != null and typeof(balance_profiles_v) != TYPE_DICTIONARY:
 		return false
+	if difficulty_profile_v != null and typeof(difficulty_profile_v) != TYPE_DICTIONARY:
+		return false
 	if typeof(services_v) != TYPE_DICTIONARY:
 		return false
 	if typeof(recent_events_v) != TYPE_ARRAY:
 		return false
 	if typeof(history_v) != TYPE_ARRAY:
+		return false
+	if typeof(scenario_rules_v) != TYPE_ARRAY:
+		return false
+	if typeof(scenario_breaches_v) != TYPE_DICTIONARY:
 		return false
 
 	var expected_size := columns * rows
@@ -1651,6 +1839,18 @@ func import_state(state: Dictionary) -> bool:
 			current_balance_profile_id = "standard"
 		else:
 			current_balance_profile_id = String(balance_profiles.keys()[0])
+	if typeof(difficulty_profile_v) == TYPE_DICTIONARY:
+		if not set_difficulty_profile(Dictionary(difficulty_profile_v)):
+			_difficulty_profile_from_default()
+	else:
+		_difficulty_profile_from_default()
+	current_era_stage_id = String(state.get("current_era_stage_id", current_era_stage_id))
+	current_era_stage_label = String(state.get("current_era_stage_label", current_era_stage_label))
+	current_theme_pressure = clamp(float(state.get("current_theme_pressure", 0.0)), 0.0, 1.0)
+	current_difficulty_growth_mult = clamp(float(state.get("current_difficulty_growth_mult", 1.0)), 0.7, 1.2)
+	current_difficulty_tax_mult = clamp(float(state.get("current_difficulty_tax_mult", 1.0)), 0.7, 1.2)
+	current_difficulty_upkeep_mult = clamp(float(state.get("current_difficulty_upkeep_mult", 1.0)), 0.85, 1.6)
+	current_difficulty_event_mult = clamp(float(state.get("current_difficulty_event_mult", 1.0)), 0.75, 1.8)
 	var service_dict: Dictionary = Dictionary(services_v)
 	service_levels["police"] = clamp(float(service_dict.get("police", 55.0)), 0.0, 100.0)
 	service_levels["fire"] = clamp(float(service_dict.get("fire", 55.0)), 0.0, 100.0)
@@ -1684,8 +1884,19 @@ func import_state(state: Dictionary) -> bool:
 	sim_paused = bool(state.get("sim_paused", false))
 	sim_tick = int(state.get("sim_tick", 0))
 	positive_cashflow_streak = int(state.get("positive_cashflow_streak", 0))
+	scenario_goal_rules.clear()
+	for rule_v in Array(scenario_rules_v):
+		if typeof(rule_v) != TYPE_DICTIONARY:
+			continue
+		scenario_goal_rules.append(Dictionary(rule_v).duplicate(true))
+	scenario_goal_breaches = Dictionary(scenario_breaches_v).duplicate(true)
+	scenario_failed = bool(scenario_failed_v)
+	scenario_fail_reason = String(scenario_fail_reason_v)
 	objectives_complete = bool(state.get("objectives_complete", false))
 	objectives_complete_tick = int(state.get("objectives_complete_tick", -1))
+	objective_mode = String(objective_mode_v)
+	if objective_mode not in [OBJECTIVE_MODE_FULL, OBJECTIVE_MODE_SCENARIO_ONLY]:
+		objective_mode = OBJECTIVE_MODE_FULL
 	economy_history.clear()
 	var history_arr: Array = history_v
 	for point_variant in history_arr:
@@ -1770,10 +1981,161 @@ func get_economy_snapshot() -> Dictionary:
 		"job_pressure": job_pressure,
 		"avg_upkeep_hook": _average_upkeep_hook(),
 		"balance_profile_id": current_balance_profile_id,
+		"era_stage_id": current_era_stage_id,
+		"era_stage_label": current_era_stage_label,
+		"theme_pressure": current_theme_pressure,
+		"difficulty_growth_mult": current_difficulty_growth_mult,
+		"difficulty_tax_mult": current_difficulty_tax_mult,
+		"difficulty_upkeep_mult": current_difficulty_upkeep_mult,
+		"difficulty_event_mult": current_difficulty_event_mult,
 		"active_event_title": String(EVENT_TITLES.get(active_event_id, "None")) if active_event_id != "" else "None",
 		"active_event_district": active_event_district,
 		"event_ticks_left": active_event_ticks_left,
 		"sim_tick": sim_tick
+	}
+
+func set_scenario_goal_rules(rules: Array) -> void:
+	scenario_goal_rules.clear()
+	scenario_goal_breaches.clear()
+	scenario_failed = false
+	scenario_fail_reason = ""
+	for i in range(rules.size()):
+		var rule_v: Variant = rules[i]
+		if typeof(rule_v) != TYPE_DICTIONARY:
+			continue
+		var rule: Dictionary = Dictionary(rule_v).duplicate(true)
+		var rule_id: String = String(rule.get("id", "goal_%d" % i))
+		rule["id"] = rule_id
+		if not rule.has("title"):
+			rule["title"] = rule_id.capitalize()
+		scenario_goal_rules.append(rule)
+		scenario_goal_breaches[rule_id] = false
+
+func get_scenario_goal_rules() -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	for rule in scenario_goal_rules:
+		output.append(rule.duplicate(true))
+	return output
+
+func get_scenario_state() -> Dictionary:
+	return {
+		"failed": scenario_failed,
+		"fail_reason": scenario_fail_reason,
+		"goal_count": scenario_goal_rules.size()
+	}
+
+func set_objective_mode(mode: String) -> bool:
+	if mode not in [OBJECTIVE_MODE_FULL, OBJECTIVE_MODE_SCENARIO_ONLY]:
+		return false
+	objective_mode = mode
+	return true
+
+func get_objective_mode() -> String:
+	return objective_mode
+
+func _update_scenario_goal_runtime() -> void:
+	if scenario_goal_rules.is_empty():
+		scenario_failed = false
+		scenario_fail_reason = ""
+		return
+	var fail_detected := false
+	var fail_reason := ""
+	for rule in scenario_goal_rules:
+		var rule_id: String = String(rule.get("id", "goal"))
+		var title: String = String(rule.get("title", rule_id))
+		var rule_type: String = String(rule.get("type", ""))
+		var target: float = float(rule.get("target", 0.0))
+		var deadline_tick: int = int(rule.get("deadline_tick", -1))
+		var hard_fail: bool = bool(rule.get("hard_fail", false))
+		var met := false
+		match rule_type:
+			"population_target":
+				met = population >= int(round(target))
+			"jobs_target":
+				met = jobs >= int(round(target))
+			"money_target":
+				met = money >= int(round(target))
+			"positive_cashflow_streak_target":
+				met = positive_cashflow_streak >= int(round(target))
+			"avg_crime_max":
+				met = avg_crime <= target
+			"avg_commute_penalty_max":
+				met = avg_commute_penalty <= target
+		if rule_type == "money_min_guard":
+			var breached: bool = bool(scenario_goal_breaches.get(rule_id, false))
+			if money < int(round(target)):
+				breached = true
+			scenario_goal_breaches[rule_id] = breached
+			if breached and hard_fail:
+				fail_detected = true
+				if fail_reason == "":
+					fail_reason = "Failed guard: %s" % title
+		elif deadline_tick > 0 and sim_tick > deadline_tick and not met:
+			fail_detected = true
+			if fail_reason == "":
+				fail_reason = "Missed deadline: %s" % title
+	scenario_failed = fail_detected
+	scenario_fail_reason = fail_reason
+
+func _scenario_goal_entry(rule: Dictionary) -> Dictionary:
+	var rule_id: String = String(rule.get("id", "goal"))
+	var title: String = String(rule.get("title", rule_id))
+	var rule_type: String = String(rule.get("type", ""))
+	var target: float = float(rule.get("target", 0.0))
+	var deadline_tick: int = int(rule.get("deadline_tick", -1))
+	var breached: bool = bool(scenario_goal_breaches.get(rule_id, false))
+	var complete := false
+	var failed := false
+	var progress := "-"
+
+	match rule_type:
+		"population_target":
+			complete = population >= int(round(target))
+			progress = "%d / %d" % [population, int(round(target))]
+		"jobs_target":
+			complete = jobs >= int(round(target))
+			progress = "%d / %d" % [jobs, int(round(target))]
+		"money_target":
+			complete = money >= int(round(target))
+			progress = "$%d / $%d" % [money, int(round(target))]
+		"positive_cashflow_streak_target":
+			complete = positive_cashflow_streak >= int(round(target))
+			progress = "%d / %d ticks" % [positive_cashflow_streak, int(round(target))]
+		"avg_crime_max":
+			if deadline_tick > 0 and sim_tick <= deadline_tick:
+				progress = "avg %.1f <= %.1f by t%d" % [avg_crime, target, deadline_tick]
+			else:
+				complete = avg_crime <= target
+				progress = "avg %.1f <= %.1f" % [avg_crime, target]
+		"avg_commute_penalty_max":
+			if deadline_tick > 0 and sim_tick <= deadline_tick:
+				progress = "avg %.2f <= %.2f by t%d" % [avg_commute_penalty, target, deadline_tick]
+			else:
+				complete = avg_commute_penalty <= target
+				progress = "avg %.2f <= %.2f" % [avg_commute_penalty, target]
+		"money_min_guard":
+			if deadline_tick > 0:
+				progress = "$%d >= $%d until t%d" % [money, int(round(target)), deadline_tick]
+			else:
+				progress = "$%d >= $%d" % [money, int(round(target))]
+			if breached:
+				failed = true
+			elif deadline_tick > 0:
+				complete = sim_tick >= deadline_tick
+			else:
+				complete = true
+		_:
+			progress = "Unsupported rule type: %s" % rule_type
+
+	if deadline_tick > 0 and sim_tick > deadline_tick and not complete and rule_type != "money_min_guard":
+		failed = true
+
+	return {
+		"id": "scenario_%s" % rule_id,
+		"title": title,
+		"complete": complete and not failed,
+		"failed": failed,
+		"progress": progress
 	}
 
 func _update_active_alerts() -> void:
@@ -1781,6 +2143,12 @@ func _update_active_alerts() -> void:
 
 	var housing_pressure: float = clamp((float(jobs) + 1.0) / (float(population) + 1.0), 0.5, 2.0)
 	var job_pressure: float = clamp((float(population) + 1.0) / (float(jobs) + 1.0), 0.5, 2.0)
+
+	if scenario_failed:
+		var detail: String = scenario_fail_reason
+		if detail == "":
+			detail = "A scenario goal condition has failed."
+		_push_alert("critical", "Scenario Failed", detail)
 
 	if money < 0:
 		_push_alert("critical", "Budget Deficit", "City treasury is negative.")
@@ -1849,48 +2217,65 @@ func get_active_alerts() -> Array[Dictionary]:
 func get_objective_snapshot() -> Array[Dictionary]:
 	var snapshot: Array[Dictionary] = []
 	var completed_count := 0
+	var failed_count := 0
 	var cash_target: int = _cash_objective_target()
-	for objective_v in OBJECTIVES:
-		var objective: Dictionary = objective_v
-		var id: String = String(objective.get("id", ""))
-		var title: String = String(objective.get("title", "Objective"))
-		var complete := false
-		var progress_text := ""
+	var include_base_objectives := true
+	if objective_mode == OBJECTIVE_MODE_SCENARIO_ONLY and not scenario_goal_rules.is_empty():
+		include_base_objectives = false
+	if include_base_objectives:
+		for objective_v in OBJECTIVES:
+			var objective: Dictionary = objective_v
+			var id: String = String(objective.get("id", ""))
+			var title: String = String(objective.get("title", "Objective"))
+			var complete := false
+			var progress_text := ""
 
-		match id:
-			"pop_500":
-				complete = population >= 500
-				progress_text = "%d / 500" % population
-			"jobs_350":
-				complete = jobs >= 350
-				progress_text = "%d / 350" % jobs
-			"cash_12000":
-				complete = money >= cash_target
-				title = "Reach treasury $%d" % cash_target
-				progress_text = "$%d / $%d" % [money, cash_target]
-			"cashflow_20":
-				complete = positive_cashflow_streak >= 20
-				progress_text = "%d / 20 ticks" % positive_cashflow_streak
-			_:
-				progress_text = "-"
+			match id:
+				"pop_500":
+					complete = population >= 500
+					progress_text = "%d / 500" % population
+				"jobs_350":
+					complete = jobs >= 350
+					progress_text = "%d / 350" % jobs
+				"cash_12000":
+					complete = money >= cash_target
+					title = "Reach treasury $%d" % cash_target
+					progress_text = "$%d / $%d" % [money, cash_target]
+				"cashflow_20":
+					complete = positive_cashflow_streak >= 20
+					progress_text = "%d / 20 ticks" % positive_cashflow_streak
+				_:
+					progress_text = "-"
 
-		snapshot.append(
-			{
-				"id": id,
-				"title": title,
-				"complete": complete,
-				"progress": progress_text
-			}
-		)
-		if complete:
+			snapshot.append(
+				{
+					"id": id,
+					"title": title,
+					"complete": complete,
+					"failed": false,
+					"progress": progress_text
+				}
+			)
+			if complete:
+				completed_count += 1
+
+	for rule in scenario_goal_rules:
+		var entry: Dictionary = _scenario_goal_entry(rule)
+		snapshot.append(entry)
+		if bool(entry.get("complete", false)):
 			completed_count += 1
+		if bool(entry.get("failed", false)):
+			failed_count += 1
+
+	var total_count := (OBJECTIVES.size() if include_base_objectives else 0) + scenario_goal_rules.size()
 
 	var just_completed := false
-	if completed_count == OBJECTIVES.size() and not objectives_complete:
+	var all_complete := total_count > 0 and completed_count == total_count and failed_count == 0 and not scenario_failed
+	if all_complete and not objectives_complete:
 		objectives_complete = true
 		objectives_complete_tick = sim_tick
 		just_completed = true
-	elif completed_count < OBJECTIVES.size() and objectives_complete:
+	elif (not all_complete) and objectives_complete:
 		objectives_complete = false
 		objectives_complete_tick = -1
 
@@ -1899,9 +2284,12 @@ func get_objective_snapshot() -> Array[Dictionary]:
 			"id": "__meta__",
 			"title": "meta",
 			"complete": objectives_complete,
-			"progress": "%d/%d" % [completed_count, OBJECTIVES.size()],
+			"progress": "%d/%d" % [completed_count, total_count],
 			"completed_count": completed_count,
-			"total_count": OBJECTIVES.size(),
+			"failed_count": failed_count,
+			"total_count": total_count,
+			"scenario_failed": scenario_failed,
+			"scenario_fail_reason": scenario_fail_reason,
 			"just_completed": just_completed,
 			"complete_tick": objectives_complete_tick
 		}

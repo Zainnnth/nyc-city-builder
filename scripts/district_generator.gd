@@ -22,6 +22,8 @@ var district_focus_points: Dictionary = {}
 var last_seed_records: Array[Dictionary] = []
 const DEFAULT_SAVE_PATH := "user://savegame.json"
 const SLOT_SAVE_TEMPLATE := "user://savegame_%d.json"
+const SAVE_SCHEMA_VERSION := 2
+const MIN_SUPPORTED_SAVE_SCHEMA_VERSION := 1
 
 const DISTRICT_COLORS := {
 	"midtown_core": Color(0.94, 0.62, 0.20, 0.38),
@@ -390,12 +392,9 @@ func save_to_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	if not city_grid.has_method("export_state"):
 		return false
 
-	var city_state: Dictionary = city_grid.call("export_state")
-	var payload := {
-		"version": 1,
-		"world_seed": int(world_seed),
-		"city_state": city_state
-	}
+	var payload: Dictionary = build_save_payload()
+	if payload.is_empty():
+		return false
 
 	var fp := FileAccess.open(path, FileAccess.WRITE)
 	if fp == null:
@@ -411,8 +410,6 @@ func save_to_slot(slot: int) -> bool:
 func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	if city_grid == null:
 		return false
-	if not city_grid.has_method("import_state"):
-		return false
 	if not FileAccess.file_exists(path):
 		return false
 
@@ -420,22 +417,7 @@ func load_from_file(path: String = DEFAULT_SAVE_PATH) -> bool:
 	if fp == null:
 		return false
 	var parsed: Variant = JSON.parse_string(fp.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return false
-	var payload: Dictionary = parsed
-	var city_state_v: Variant = payload.get("city_state", {})
-	if typeof(city_state_v) != TYPE_DICTIONARY:
-		return false
-
-	world_seed = int(payload.get("world_seed", world_seed))
-	rng.seed = int(world_seed)
-	var ok: bool = city_grid.call("import_state", city_state_v)
-	if not ok:
-		return false
-	_rebuild_overlay_from_city_grid()
-	_update_seed_records(_seed_records_from_city_grid())
-	queue_redraw()
-	return true
+	return load_payload(parsed)
 
 func load_from_slot(slot: int) -> bool:
 	if slot < 1 or slot > 3:
@@ -464,6 +446,90 @@ func load_latest_slot() -> int:
 	if not ok:
 		return -1
 	return latest_slot
+
+func get_save_schema_version() -> int:
+	return SAVE_SCHEMA_VERSION
+
+func build_save_payload() -> Dictionary:
+	if city_grid == null:
+		return {}
+	if not city_grid.has_method("export_state"):
+		return {}
+	var city_state_v: Variant = city_grid.call("export_state")
+	if typeof(city_state_v) != TYPE_DICTIONARY:
+		return {}
+	var now_unix: int = int(Time.get_unix_time_from_system())
+	return {
+		"schema_version": SAVE_SCHEMA_VERSION,
+		"saved_at_unix": now_unix,
+		"world_seed": int(world_seed),
+		"city_state": Dictionary(city_state_v).duplicate(true),
+		"meta": {
+			"source": "district_generator"
+		}
+	}
+
+func load_payload(payload_v: Variant) -> bool:
+	if city_grid == null:
+		return false
+	if not city_grid.has_method("import_state"):
+		return false
+	if typeof(payload_v) != TYPE_DICTIONARY:
+		return false
+	var normalized: Dictionary = _normalize_save_payload(Dictionary(payload_v))
+	if normalized.is_empty():
+		return false
+	var city_state_v: Variant = normalized.get("city_state", {})
+	if typeof(city_state_v) != TYPE_DICTIONARY:
+		return false
+
+	world_seed = int(normalized.get("world_seed", world_seed))
+	rng.seed = int(world_seed)
+	var ok: bool = city_grid.call("import_state", city_state_v)
+	if not ok:
+		return false
+	_rebuild_overlay_from_city_grid()
+	_update_seed_records(_seed_records_from_city_grid())
+	queue_redraw()
+	return true
+
+func _normalize_save_payload(payload: Dictionary) -> Dictionary:
+	if payload.is_empty():
+		return {}
+	var schema_version: int = _detect_save_schema_version(payload)
+	if schema_version < MIN_SUPPORTED_SAVE_SCHEMA_VERSION:
+		return {}
+	if schema_version > SAVE_SCHEMA_VERSION:
+		push_warning("DistrictGenerator: save schema %d is newer than supported %d; attempting best-effort load." % [schema_version, SAVE_SCHEMA_VERSION])
+
+	var city_state_v: Variant = payload.get("city_state", null)
+	if city_state_v == null and payload.has("state"):
+		city_state_v = payload.get("state")
+	if city_state_v == null and _looks_like_city_state(payload):
+		city_state_v = payload.duplicate(true)
+	if typeof(city_state_v) != TYPE_DICTIONARY:
+		return {}
+
+	var normalized_seed: int = int(payload.get("world_seed", payload.get("seed", world_seed)))
+	return {
+		"schema_version": min(schema_version, SAVE_SCHEMA_VERSION),
+		"world_seed": normalized_seed,
+		"city_state": Dictionary(city_state_v).duplicate(true)
+	}
+
+func _detect_save_schema_version(payload: Dictionary) -> int:
+	if payload.has("schema_version"):
+		return int(payload.get("schema_version", SAVE_SCHEMA_VERSION))
+	if payload.has("version"):
+		return int(payload.get("version", 1))
+	if payload.has("city_state") or payload.has("state"):
+		return 1
+	if _looks_like_city_state(payload):
+		return 1
+	return 0
+
+func _looks_like_city_state(payload: Dictionary) -> bool:
+	return payload.has("zone_by_index") and payload.has("road_by_index") and payload.has("building_level_by_index")
 
 func _rebuild_overlay_from_city_grid() -> void:
 	overlay_blocks.clear()
