@@ -16,6 +16,8 @@ tools/dev/benchmarks/*.json
 # NYC3D local intake/conversion artifacts (kept local, regenerated via scripts)
 data/raw/nyc3d/source/*.3dm
 assets/buildings/nyc3d/*.glb
+assets/buildings/nyc3d/buildings/
 data/processed/nyc3d_district_mesh_manifest.json
+data/processed/nyc3d_buildings/
 data/runtime/nyc3d_art_pass_manifest.json
 tools/pipeline/node/node_modules/

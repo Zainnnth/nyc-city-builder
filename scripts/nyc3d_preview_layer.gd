@@ -33,7 +33,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _setup_overlay() -> void:
 	overlay_layer = CanvasLayer.new()
-	overlay_layer.layer = -20
+	overlay_layer.layer = 0
 	add_child(overlay_layer)
 
 	overlay_rect = TextureRect.new()
@@ -99,7 +99,8 @@ func _load_manifest_meshes() -> void:
 	if typeof(entries_v) != TYPE_ARRAY:
 		return
 	var entries: Array = entries_v
-	for entry_v in entries:
+	for i in range(entries.size()):
+		var entry_v: Variant = entries[i]
 		if typeof(entry_v) != TYPE_DICTIONARY:
 			continue
 		var entry: Dictionary = entry_v
@@ -119,6 +120,7 @@ func _load_manifest_meshes() -> void:
 		var root3d: Node3D = inst
 		_apply_entry_tint(root3d, entry)
 		world_root.add_child(root3d)
+		_normalize_chunk_transform(root3d, i)
 
 func _instantiate_gltf_scene(path: String) -> Node:
 	var ext: String = path.get_extension().to_lower()
@@ -183,6 +185,28 @@ func _fit_camera_to_content() -> void:
 	camera_3d.position = center + Vector3(0.0, max(size.y * 1.4, 650.0), max(size.z * 0.8, 650.0))
 	camera_3d.look_at(center, Vector3.UP)
 	camera_3d.size = max(size.x, size.z) * 0.58
+
+func _normalize_chunk_transform(root: Node3D, idx: int) -> void:
+	var pair: Array = _bounds_for_node(root)
+	if pair.is_empty():
+		return
+	var min_v: Vector3 = pair[0]
+	var max_v: Vector3 = pair[1]
+	var center: Vector3 = (min_v + max_v) * 0.5
+	var size: Vector3 = max_v - min_v
+	var planar: float = max(size.x, size.z)
+	if planar <= 0.001:
+		planar = 1.0
+	var target_planar := 620.0
+	var scale_mult: float = clamp(target_planar / planar, 0.0001, 50.0)
+	root.scale = Vector3.ONE * scale_mult
+
+	var cols := 3
+	var col: int = idx % cols
+	var row: int = idx / cols
+	var spacing := 760.0
+	var offset := Vector3((float(col) - 1.0) * spacing, 0.0, float(row) * spacing)
+	root.position = -center * scale_mult + offset
 
 func _bounds_for_node(root: Node) -> Array:
 	var has := false

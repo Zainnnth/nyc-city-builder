@@ -232,6 +232,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `powershell -ExecutionPolicy Bypass -File tools/dev/refresh_nyc3d_partial_manifests.ps1`
 - NYC 3D conversion status report:
   - `powershell -ExecutionPolicy Bypass -File tools/dev/report_nyc3d_conversion_status.ps1`
+- NYC 3D per-building extraction (catalog, optional glb export):
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/extract_nyc3d_buildings.ps1 -DistrictCode MN01 -MaxBuildingsPerDistrict 200`
+  - Optional meshes: add `-WriteGlb`
 - NYC 3D in-game preview overlay:
   - Main scene loads converted district `.glb` chunks from `data/processed/nyc3d_district_mesh_manifest.json`
   - Toggle overlay with `H`
@@ -260,5 +263,5 @@ python tools/pipeline/scripts/segment_districts.py \
 ## Next Milestones
 
 1. Continue NYC3D district conversion with robust external converter path for remaining entries.
-2. Refresh partial NYC3D manifests and keep preview/runtime synced to converted chunks.
-3. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.
+2. Extract per-building catalogs from converted districts and begin building-level spawn integration.
+3. Refresh partial NYC3D manifests and keep preview/runtime synced to converted chunks.

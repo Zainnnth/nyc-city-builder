@@ -18,6 +18,7 @@ This pipeline is for collecting and transforming NYC building data from permitte
 - `scripts/register_landmark_asset.py`: register landmark mesh intake, update runtime manifest, append provenance.
 - `scripts/build_nyc3d_manifest.py`: scan district `.3dm` files and generate `data/raw/nyc3d/manifest.json`.
 - `scripts/prepare_nyc3d_mesh_manifest.py`: map NYC community-district mesh batches to game districts + art pass metadata.
+- `../node/extract_buildings_from_3dm.js`: extract per-building catalog from district `.3dm` (optional per-building `.glb` files).
 - `../../data/raw/`: place downloaded source files here.
 - `../../data/processed/`: generated outputs.
 - `../../data/provenance/`: provenance logs.
@@ -39,6 +40,9 @@ This pipeline is for collecting and transforming NYC building data from permitte
      - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_partial_20260321 --license-id NYC_OPEN_DATA --skip-missing-glb --skip-provenance`
 6. Bootstrap NYC 3D input manifest from local `.3dm` files:
    - `python tools/pipeline/scripts/build_nyc3d_manifest.py`
+7. Extract building-level catalog from a district file:
+   - `node tools/pipeline/node/extract_buildings_from_3dm.js --input data/raw/nyc3d/source/MN01.3dm --district-code MN01 --district-id financial_district --style-profile historic_core_tower_mix --out-catalog data/processed/nyc3d_buildings/MN01/catalog.json --max-buildings 200`
+   - Optional mesh export: add `--write-glb --out-glb-dir assets/buildings/nyc3d/buildings/MN01`
 
 ## Schema Mapping Options
 
