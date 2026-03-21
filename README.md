@@ -227,6 +227,8 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb`
 - NYC 3D district mesh manifest builder:
   - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_20260321 --license-id NYC_OPEN_DATA --allow-missing-glb`
+- NYC 3D input manifest bootstrap:
+  - `python tools/pipeline/scripts/build_nyc3d_manifest.py`
 - NYC3D mapping config:
   - `tools/pipeline/config/nyc3d_community_district_map.json`
 - Sample input: `data/raw/sample_buildings.geojson`

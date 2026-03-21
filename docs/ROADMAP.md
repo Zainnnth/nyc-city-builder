@@ -66,6 +66,7 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] Asset source policy and license allowlist (no Google Earth extraction)
 - [x] NYC building dataset ingest for footprint + height + district tagging
 - [x] NYC 3D community-district mesh mapping manifest (district + art-pass metadata)
+- [x] NYC 3D raw intake bootstrap (`.3dm` scan -> manifest generator)
 - [x] Procedural massing generator (footprint -> lowpoly mesh kit) for fast coverage
 - [x] Landmark placement rules v0 (weighted district/archetype proxies)
 - [x] Hand-authored landmark pack v0 (hero proxies + LOD tiers)
