@@ -16,6 +16,7 @@ This pipeline is for collecting and transforming NYC building data from permitte
 - `scripts/ingest_buildings.py`: normalize source GeoJSON to internal schema.
 - `scripts/segment_districts.py`: assign district tags from lon/lat bboxes.
 - `scripts/register_landmark_asset.py`: register landmark mesh intake, update runtime manifest, append provenance.
+- `scripts/prepare_nyc3d_mesh_manifest.py`: map NYC community-district mesh batches to game districts + art pass metadata.
 - `../../data/raw/`: place downloaded source files here.
 - `../../data/processed/`: generated outputs.
 - `../../data/provenance/`: provenance logs.
@@ -29,6 +30,8 @@ This pipeline is for collecting and transforming NYC building data from permitte
    - `python tools/pipeline/scripts/segment_districts.py --input data/processed/buildings_normalized.geojson --districts tools/pipeline/config/district_profiles.json --out data/processed/buildings_districted.geojson`
 4. Register landmark mesh intake:
    - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb --author "Author Name" --attribution "CC BY 4.0 - Author Name"`
+5. Prepare NYC 3D district mesh manifest (after `.3dm` -> `.glb` conversion):
+   - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_20260321 --license-id NYC_OPEN_DATA --allow-missing-glb`
 
 ## Schema Mapping Options
 
@@ -51,3 +54,4 @@ Example using feet-based source heights:
 - Coordinate assumptions for district segmentation: WGS84 lon/lat (`EPSG:4326`).
 - Replace bbox segmentation with full polygon tests later for better accuracy.
 - Landmark source policy allows licensed Sketchfab/Fab assets and blocks Google Earth extraction sources.
+- NYC 3D source intake mapping config: `tools/pipeline/config/nyc3d_community_district_map.json`.

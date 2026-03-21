@@ -1,0 +1,22 @@
+{
+  "exact_map": {
+    "MN01": "financial_district",
+    "MN03": "lower_east_side",
+    "MN04": "midtown_core",
+    "MN05": "midtown_core",
+    "MN06": "midtown_core",
+    "MN09": "harlem",
+    "MN10": "harlem",
+    "MN11": "harlem",
+    "QN01": "queens_west",
+    "QN02": "queens_west"
+  },
+  "borough_fallback_map": {
+    "MN": "midtown_core",
+    "QN": "queens_west",
+    "BK": "outer_borough_mix",
+    "BX": "outer_borough_mix",
+    "SI": "outer_borough_mix"
+  },
+  "default_district_id": "outer_borough_mix"
+}

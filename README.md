@@ -225,6 +225,10 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `powershell -ExecutionPolicy Bypass -File tools/dev/validate_landmark_pack.ps1`
 - Landmark intake registration:
   - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb`
+- NYC 3D district mesh manifest builder:
+  - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_20260321 --license-id NYC_OPEN_DATA --allow-missing-glb`
+- NYC3D mapping config:
+  - `tools/pipeline/config/nyc3d_community_district_map.json`
 - Sample input: `data/raw/sample_buildings.geojson`
 
 Example run:
@@ -245,6 +249,6 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.
-2. Complete all six landmark slots and verify with `validate_landmark_pack.ps1`.
-3. District-specific event content expansion and tuning.
+1. Convert first NYC3D community district chunks (`MN01`, `MN05`, `QN01`) from `.3dm` to `.glb` and build mesh manifest.
+2. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.
+3. Complete all six landmark slots and verify with `validate_landmark_pack.ps1`.

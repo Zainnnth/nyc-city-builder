@@ -18,3 +18,10 @@ Do not manually edit historical rows except to correct obvious metadata mistakes
 - author/attribution
 - license ID and source ID
 - target `scene_path` used by runtime
+
+`nyc3d_mesh_ingest_log.jsonl` is append-only and records NYC 3D district batch ingest details:
+
+- community district code (for example `MN01`)
+- mapped in-game district and style profile
+- source `.3dm` path and target `.glb` path
+- source/license/dataset metadata

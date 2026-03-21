@@ -30,6 +30,9 @@ Use this checklist before importing new building/model datasets.
 - [ ] Output includes `district_id` and `style_profile`.
 - [ ] Spot-check sample records by district.
 - [ ] Fallback district behavior verified.
+- [ ] For NYC3D mesh batches, run:
+  - [ ] `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest ... --dataset-name ...`
+  - [ ] Verify generated `data/processed/nyc3d_district_mesh_manifest.json`.
 
 ## 5) Game Integration Gate
 

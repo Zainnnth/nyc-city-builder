@@ -1,0 +1,23 @@
+{
+  "source_url": "https://www.nyc.gov/content/planning/pages/resources/datasets/nyc-3d-model",
+  "entries": [
+    {
+      "community_district": "MN01",
+      "source_path": "data/raw/nyc3d/source/MN01.3dm",
+      "glb_path": "assets/buildings/nyc3d/MN01.glb",
+      "building_count_hint": 0
+    },
+    {
+      "community_district": "MN05",
+      "source_path": "data/raw/nyc3d/source/MN05.3dm",
+      "glb_path": "assets/buildings/nyc3d/MN05.glb",
+      "building_count_hint": 0
+    },
+    {
+      "community_district": "QN01",
+      "source_path": "data/raw/nyc3d/source/QN01.3dm",
+      "glb_path": "assets/buildings/nyc3d/QN01.glb",
+      "building_count_hint": 0
+    }
+  ]
+}
