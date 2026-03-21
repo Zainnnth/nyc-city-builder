@@ -186,6 +186,16 @@ def main() -> None:
         action="store_true",
         help="Allow manifest generation even if glb files are not present yet.",
     )
+    parser.add_argument(
+        "--skip-missing-glb",
+        action="store_true",
+        help="Skip entries whose glb files are missing (useful for partial conversion batches).",
+    )
+    parser.add_argument(
+        "--skip-provenance",
+        action="store_true",
+        help="Do not append provenance CSV/JSONL logs (useful for local dry runs).",
+    )
     args = parser.parse_args()
 
     for required in [args.input_manifest, args.policy, args.district_map, args.district_profiles, args.district_identity]:
@@ -206,6 +216,7 @@ def main() -> None:
     source_url = str(batch.get("source_url", ""))
     output_entries: list[dict[str, Any]] = []
     art_pass_by_district: dict[str, dict[str, Any]] = {}
+    skipped_missing = 0
 
     for idx, raw_entry in enumerate(entries):
         if not isinstance(raw_entry, dict):
@@ -220,6 +231,9 @@ def main() -> None:
 
         glb_fs = Path(glb_path.replace("res://", ""))
         if not args.allow_missing_glb and not glb_fs.exists():
+            if args.skip_missing_glb:
+                skipped_missing += 1
+                continue
             raise FileNotFoundError(
                 f"GLB path not found for {cd}: {glb_path}. Use --allow-missing-glb to stage metadata before conversion."
             )
@@ -241,29 +255,30 @@ def main() -> None:
             }
         )
 
-        append_provenance_row(
-            args.provenance_log,
-            args.source_id,
-            args.dataset_name,
-            args.license_id,
-            source_path or source_url or f"nyc3d:{cd}",
-            glb_path,
-        )
-        append_jsonl(
-            args.nyc3d_log,
-            {
-                "timestamp_utc": dt.datetime.now(dt.UTC).isoformat(),
-                "source_id": args.source_id,
-                "dataset_name": args.dataset_name,
-                "license_id": args.license_id,
-                "source_url": source_url,
-                "community_district": cd,
-                "district_id": district_id,
-                "style_profile": style_profile,
-                "source_path": source_path,
-                "glb_path": glb_path,
-            },
-        )
+        if not args.skip_provenance:
+            append_provenance_row(
+                args.provenance_log,
+                args.source_id,
+                args.dataset_name,
+                args.license_id,
+                source_path or source_url or f"nyc3d:{cd}",
+                glb_path,
+            )
+            append_jsonl(
+                args.nyc3d_log,
+                {
+                    "timestamp_utc": dt.datetime.now(dt.UTC).isoformat(),
+                    "source_id": args.source_id,
+                    "dataset_name": args.dataset_name,
+                    "license_id": args.license_id,
+                    "source_url": source_url,
+                    "community_district": cd,
+                    "district_id": district_id,
+                    "style_profile": style_profile,
+                    "source_path": source_path,
+                    "glb_path": glb_path,
+                },
+            )
 
     mesh_manifest = {
         "source_id": args.source_id,
@@ -284,9 +299,14 @@ def main() -> None:
 
     print(f"Wrote district mesh manifest -> {args.out_mesh_manifest}")
     print(f"Wrote district art-pass manifest -> {args.out_art_pass_manifest}")
-    print(f"Provenance appended -> {args.provenance_log}")
-    print(f"NYC3D intake detail log appended -> {args.nyc3d_log}")
+    if args.skip_provenance:
+        print("Provenance append skipped (--skip-provenance).")
+    else:
+        print(f"Provenance appended -> {args.provenance_log}")
+        print(f"NYC3D intake detail log appended -> {args.nyc3d_log}")
     print(f"Entries processed: {len(output_entries)}")
+    if skipped_missing > 0:
+        print(f"Entries skipped_missing_glb: {skipped_missing}")
 
 
 if __name__ == "__main__":

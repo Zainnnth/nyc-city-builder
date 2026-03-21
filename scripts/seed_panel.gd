@@ -77,10 +77,21 @@ const AUTOSAVE_INTERVAL := 20.0
 var banner_acknowledged := false
 var is_syncing_services := false
 var is_syncing_balance := false
+var last_viewport_size: Vector2 = Vector2.ZERO
 var scenario_cards: Dictionary = {}
 var scenario_card_order: Array[String] = []
 var tutorial_step_index := 0
 var tutorial_active := false
+var compact_mode := false
+var hud_mode_button: Button
+const COMPACT_TOGGLE_KEY := KEY_TAB
+const COMPACT_HIDE_PANELS := [
+	"OverlayPanel",
+	"EventPanel",
+	"AlertsPanel",
+	"TutorialPanel",
+	"MilestoneBanner"
+]
 const TUTORIAL_STATE_PATH := "user://tutorial_state.json"
 const TUTORIAL_STEPS := [
 	{
@@ -200,7 +211,10 @@ func _ready() -> void:
 	popup_panel.visible = false
 	milestone_banner.visible = false
 	tutorial_panel.visible = false
+	_setup_hud_mode_button()
 	_apply_retro_ui_theme()
+	_apply_layout_pass_v1()
+	last_viewport_size = get_viewport().get_visible_rect().size
 	_apply_tooltips()
 	_init_slot_ui()
 	_init_balance_profiles()
@@ -211,8 +225,88 @@ func _ready() -> void:
 	_refresh_economy()
 	_refresh_event_panel()
 	_refresh_objectives()
+	_set_compact_mode(false)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == COMPACT_TOGGLE_KEY:
+		if input_seed.has_focus():
+			return
+		_set_compact_mode(not compact_mode)
+
+func _apply_layout_pass_v1() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return
+
+	var margin: float = 14.0
+	var gap: float = 10.0
+	var left_w: float = float(clamp(viewport_size.x * 0.26, 352.0, 420.0))
+	var mid_w: float = float(clamp(viewport_size.x * 0.2, 270.0, 320.0))
+	var right_x: float = margin + left_w + gap + mid_w + gap
+	var right_w: float = max(300.0, viewport_size.x - right_x - margin)
+	var top_h: float = 190.0
+	var demand_h: float = float(clamp(viewport_size.y * 0.39, 256.0, 340.0))
+	var services_h: float = max(178.0, viewport_size.y - margin * 2.0 - top_h - demand_h - gap * 2.0)
+
+	_set_panel_rect(get_node_or_null("Panel"), margin, margin, left_w, top_h)
+	_set_panel_rect(get_node_or_null("DemandPanel"), margin, margin + top_h + gap, left_w, demand_h)
+	_set_panel_rect(get_node_or_null("ServicesPanel"), margin, margin + top_h + gap + demand_h + gap, left_w, services_h)
+
+	var mid_x: float = margin + left_w + gap
+	_set_panel_rect(get_node_or_null("EconomyPanel"), mid_x, margin, mid_w, 154.0)
+	_set_panel_rect(get_node_or_null("ObjectivesPanel"), mid_x, margin + 154.0 + gap, mid_w, 120.0)
+	_set_panel_rect(get_node_or_null("AlertsPanel"), mid_x, margin + 154.0 + gap + 120.0 + gap, mid_w, viewport_size.y - (margin + 154.0 + gap + 120.0 + gap) - margin)
+	_set_panel_rect(get_node_or_null("DistrictPopup"), mid_x, margin, mid_w, 230.0)
+
+	_set_panel_rect(get_node_or_null("MilestoneBanner"), right_x, margin, right_w, 112.0)
+	_set_panel_rect(get_node_or_null("OverlayPanel"), right_x, margin + 112.0 + gap, right_w, 104.0)
+	_set_panel_rect(get_node_or_null("EventPanel"), right_x, margin + 112.0 + gap + 104.0 + gap, right_w, 134.0)
+	_set_panel_rect(get_node_or_null("TutorialPanel"), right_x, margin + 112.0 + gap + 104.0 + gap + 134.0 + gap, right_w, 152.0)
+	_set_panel_rect(get_node_or_null("ScenarioCardsPanel"), right_x, margin + 112.0 + gap + 104.0 + gap + 134.0 + gap + 152.0 + gap, right_w, viewport_size.y - (margin + 112.0 + gap + 104.0 + gap + 134.0 + gap + 152.0 + gap) - margin)
+
+	if hud_mode_button != null:
+		hud_mode_button.position = Vector2(right_x + right_w - 132.0, margin + 4.0)
+		hud_mode_button.size = Vector2(128.0, 26.0)
+
+func _set_panel_rect(node: Node, left: float, top: float, width: float, height: float) -> void:
+	if not (node is Control):
+		return
+	var ctl: Control = node
+	ctl.offset_left = left
+	ctl.offset_top = top
+	ctl.offset_right = left + max(80.0, width)
+	ctl.offset_bottom = top + max(40.0, height)
+
+func _setup_hud_mode_button() -> void:
+	hud_mode_button = Button.new()
+	hud_mode_button.text = "HUD: Full"
+	hud_mode_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud_mode_button.pressed.connect(_on_toggle_compact_mode)
+	add_child(hud_mode_button)
+
+func _on_toggle_compact_mode() -> void:
+	_set_compact_mode(not compact_mode)
+
+func _set_compact_mode(enabled: bool) -> void:
+	compact_mode = enabled
+	for panel_name in COMPACT_HIDE_PANELS:
+		var panel_node: Node = get_node_or_null(panel_name)
+		if panel_node == null:
+			continue
+		if panel_name == "TutorialPanel" and tutorial_active:
+			panel_node.set("visible", true)
+			continue
+		panel_node.set("visible", not compact_mode)
+	if hud_mode_button != null:
+		hud_mode_button.text = "HUD: Compact" if compact_mode else "HUD: Full"
+		hud_mode_button.tooltip_text = "Toggle HUD clutter reduction (Tab)."
 
 func _process(delta: float) -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if viewport_size != last_viewport_size:
+		last_viewport_size = viewport_size
+		_apply_layout_pass_v1()
+
 	ui_timer += delta
 	if ui_timer >= 0.4:
 		ui_timer = 0.0
@@ -636,6 +730,8 @@ func _apply_tooltips() -> void:
 	transit_slider.tooltip_text = "Higher transit improves growth and commute outcomes."
 	overlay_select.tooltip_text = "Select an overlay to visualize hidden simulation pressures."
 	trigger_event_button.tooltip_text = "Force a random district event for stress testing."
+	if hud_mode_button != null:
+		hud_mode_button.tooltip_text = "Toggle compact HUD mode to reduce panel clutter (Tab)."
 
 func _on_slot_changed(_idx: int) -> void:
 	autosave_next_slot = _current_slot()
@@ -1130,6 +1226,7 @@ func _apply_retro_ui_theme() -> void:
 	button_pressed.border_color = Color(0.91, 0.62, 0.28, 1.0)
 
 	for btn in _all_buttons():
+		btn.custom_minimum_size = Vector2(0.0, 28.0)
 		btn.add_theme_stylebox_override("normal", button_normal.duplicate())
 		btn.add_theme_stylebox_override("hover", button_hover.duplicate())
 		btn.add_theme_stylebox_override("pressed", button_pressed.duplicate())
@@ -1137,10 +1234,16 @@ func _apply_retro_ui_theme() -> void:
 		btn.add_theme_color_override("font_hover_color", Color(0.94, 0.67, 0.3, 1.0))
 		btn.add_theme_color_override("font_pressed_color", Color(0.98, 0.84, 0.62, 1.0))
 
+	for picker in [slot_select, balance_profile_select, scenario_card_select, overlay_select]:
+		picker.custom_minimum_size = Vector2(0.0, 28.0)
+
+	for slider in [police_slider, fire_slider, sanitation_slider, transit_slider]:
+		slider.custom_minimum_size = Vector2(0.0, 24.0)
+
 	_apply_label_palette(self)
 
 func _all_buttons() -> Array[Button]:
-	return [
+	var buttons: Array[Button] = [
 		apply_button,
 		random_button,
 		save_button,
@@ -1161,12 +1264,15 @@ func _all_buttons() -> Array[Button]:
 		tutorial_next_button,
 		tutorial_skip_button
 	]
+	if hud_mode_button != null:
+		buttons.append(hud_mode_button)
+	return buttons
 
 func _apply_label_palette(root: Node) -> void:
 	for child in root.get_children():
 		if child is Label:
 			var label: Label = child
 			label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.93, 0.98))
-			if label.text.find("Title") != -1:
+			if label.name == "Title" or label.name.find("Title") != -1:
 				label.add_theme_color_override("font_color", Color(0.95, 0.66, 0.32, 0.98))
 		_apply_label_palette(child)

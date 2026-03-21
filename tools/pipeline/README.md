@@ -33,6 +33,10 @@ This pipeline is for collecting and transforming NYC building data from permitte
    - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb --author "Author Name" --attribution "CC BY 4.0 - Author Name"`
 5. Prepare NYC 3D district mesh manifest (after `.3dm` -> `.glb` conversion):
    - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_20260321 --license-id NYC_OPEN_DATA --allow-missing-glb`
+   - For partial conversion batches, generate runtime manifests from only converted chunks:
+     - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_partial_20260321 --license-id NYC_OPEN_DATA --skip-missing-glb`
+   - For local refresh loops without provenance writes:
+     - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_partial_20260321 --license-id NYC_OPEN_DATA --skip-missing-glb --skip-provenance`
 6. Bootstrap NYC 3D input manifest from local `.3dm` files:
    - `python tools/pipeline/scripts/build_nyc3d_manifest.py`
 

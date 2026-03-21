@@ -12,3 +12,10 @@ tools/dev/benchmarks/*.csv
 tools/dev/benchmarks/*.json
 !tools/dev/benchmarks/budget_thresholds.json
 !tools/dev/benchmarks/scenario_winrate_targets.json
+
+# NYC3D local intake/conversion artifacts (kept local, regenerated via scripts)
+data/raw/nyc3d/source/*.3dm
+assets/buildings/nyc3d/*.glb
+data/processed/nyc3d_district_mesh_manifest.json
+data/runtime/nyc3d_art_pass_manifest.json
+tools/pipeline/node/node_modules/

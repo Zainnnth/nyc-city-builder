@@ -114,8 +114,9 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - Population/jobs capacity updates with service and event modifiers.
   - Money updates from taxes and upkeep with district/style/event modifiers.
   - District-specific upkeep hooks recalculate from live stress signals.
-- Camera pan with arrow keys.
+- Camera pan with `W/A/S/D`.
 - Mouse-wheel zoom.
+- `Tab` toggles compact HUD mode (or use `HUD: Full/Compact` button).
 - `G` toggles district overlay visualization.
 
 ## Run
@@ -227,6 +228,13 @@ A Godot 4 starter project for a city-builder inspired by late-90s / early-2000s 
   - `python tools/pipeline/scripts/register_landmark_asset.py --landmark-key empire_state_proxy --source-id sketchfab --dataset-name empire_state_v1 --license-id CC_BY_4_0 --source-url https://sketchfab.com/... --scene-path res://assets/landmarks/nyc/empire_state/empire_state.glb`
 - NYC 3D district mesh manifest builder:
   - `python tools/pipeline/scripts/prepare_nyc3d_mesh_manifest.py --input-manifest data/raw/nyc3d/manifest.json --dataset-name nyc3d_20260321 --license-id NYC_OPEN_DATA --allow-missing-glb`
+- NYC 3D partial manifest refresh (converted `.glb` only):
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/refresh_nyc3d_partial_manifests.ps1`
+- NYC 3D conversion status report:
+  - `powershell -ExecutionPolicy Bypass -File tools/dev/report_nyc3d_conversion_status.ps1`
+- NYC 3D in-game preview overlay:
+  - Main scene loads converted district `.glb` chunks from `data/processed/nyc3d_district_mesh_manifest.json`
+  - Toggle overlay with `H`
 - NYC 3D input manifest bootstrap:
   - `python tools/pipeline/scripts/build_nyc3d_manifest.py`
 - NYC3D mapping config:
@@ -251,6 +259,6 @@ python tools/pipeline/scripts/segment_districts.py \
 
 ## Next Milestones
 
-1. Convert first NYC3D community district chunks (`MN01`, `MN05`, `QN01`) from `.3dm` to `.glb` and build mesh manifest.
-2. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.
-3. Complete all six landmark slots and verify with `validate_landmark_pack.ps1`.
+1. Continue NYC3D district conversion with robust external converter path for remaining entries.
+2. Refresh partial NYC3D manifests and keep preview/runtime synced to converted chunks.
+3. Import first two licensed landmark meshes (`Empire State`, `Chrysler`) and tune scene offsets/scales.

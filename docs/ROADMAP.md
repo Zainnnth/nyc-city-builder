@@ -74,3 +74,13 @@ Build a stylized late-90s/early-2000s NYC city-builder prototype with district-d
 - [x] District-based prefab set assignment and weighted spawn rules
 - [x] Godot import presets + optimization (LODs, occlusion, batching checks)
 - [x] Landmark intake automation (policy validation + provenance registration script)
+
+## Phase 8 - UI Polish and Model Continuation (Current)
+
+- [x] Camera movement updated to `W/A/S/D`
+- [x] UI polish pass v1 (panel spacing/alignment hierarchy for city-builder readability)
+- [x] UI polish pass v1 (consistent typography/contrast and state color system)
+- [x] UI polish pass v1 (cleanup of control grouping and reduced HUD clutter)
+- [x] NYC3D conversion status/report tooling + partial-manifest refresh workflow
+- [ ] NYC3D conversion continuation (remaining district `.3dm` files via robust external converter path)
+- [ ] NYC3D runtime integration pass (replace preview overlay with production world streaming/placement)
